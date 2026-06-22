@@ -1,0 +1,42 @@
+schema: spec-driven
+
+context: |
+  Tech stack: vanilla HTML/CSS/JS PWA, no build step, no framework
+  Architecture: single-user mobile-first dashboard; pages: index, gym, water, weight, sleep, finance
+  Data: localStorage persistence; Netlify deploy with functions support
+  Style: dark theme, terminal/monospace aesthetic, CSS custom properties
+  Shared JS: topbar.js (nav), pwa.js (service worker registration), service-worker.js (PWA offline)
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    - Follow existing code patterns
+    tdd: false
+    test_command: ""
+  verify:
+    test_command: ""
+    build_command: ""
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
+
+testing:
+  strict_tdd: false
+  runner: null
+  unit: false
+  integration: false
+  e2e: false
+  coverage: false
+  linter: false
+  type_checker: false
+  formatter: false
