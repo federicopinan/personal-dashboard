@@ -177,7 +177,12 @@
       @keyframes pdPageEnter { from { opacity: 0; transform: translateY(8px) scale(0.995); filter: blur(2px); } to { opacity: 1; transform: none; filter: none; } }
       @keyframes pdPageLeave { to { opacity: 0; transform: translateY(-6px) scale(0.995); filter: blur(2px); } }
 
-      /* ── Dock / Tabbar (mobile bottom) ──────────────────── */
+      /* ── Keep content above the fixed dock ──────────────── */
+      body {
+        padding-bottom: calc(90px + env(safe-area-inset-bottom));
+      }
+
+      /* ── Dock / Tabbar (fixed bottom) ──────────────────── */
       .tabbar {
         position: fixed;
         left: 0; right: 0; bottom: 0;
