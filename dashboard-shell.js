@@ -194,26 +194,29 @@
         top: 0;
         left: 0;
         right: 0;
-        z-index: 50;
+        z-index: 9999;
         display: flex;
         justify-content: center;
         margin: 0;
         padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px;
-        background: rgba(5,5,6,0.94);
-        backdrop-filter: blur(18px) saturate(1.4);
-        -webkit-backdrop-filter: blur(18px) saturate(1.4);
-        border-bottom: 1px solid rgba(255,255,255,0.04);
+        background: transparent;
         pointer-events: none;
       }
       .tabbar-inner {
         pointer-events: auto;
         display: flex;
         width: 100%; max-width: 500px;
-        gap: 6px; padding: 6px;
-        background: rgba(20,20,22,0.72);
-        border: 1px solid rgba(255,255,255,0.06);
-        border-radius: 18px;
-        box-shadow: 0 12px 36px rgba(0,0,0,0.55);
+        gap: 4px; padding: 5px;
+        background: rgba(255, 255, 255, 0.065);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 22px;
+        backdrop-filter: blur(40px) saturate(2.2) brightness(1.08);
+        -webkit-backdrop-filter: blur(40px) saturate(2.2) brightness(1.08);
+        box-shadow:
+          inset 0 1.5px 0 rgba(255, 255, 255, 0.14),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.12),
+          0 8px 32px rgba(0, 0, 0, 0.45),
+          0 2px 8px rgba(0, 0, 0, 0.25);
       }
       .tab {
         flex: 1 1 0;
@@ -263,7 +266,8 @@
 
   function renderDock() {
     const current = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
-    const nav = document.querySelector('nav.tabbar') || document.createElement('nav');
+    const existing = document.querySelector('nav.tabbar');
+    const nav = existing || document.createElement('nav');
     nav.className = 'tabbar';
     nav.setAttribute('aria-label', 'Main navigation');
     nav.innerHTML = '<div class="tabbar-inner">' + NAV_ITEMS.map((item) => {
@@ -276,14 +280,14 @@
 
     document.body.classList.add('pd-has-dock');
 
-    const placeholder = document.getElementById('dock-placeholder');
-    if (placeholder && placeholder.parentNode) {
-      placeholder.parentNode.replaceChild(nav, placeholder);
-    } else {
-      const container = document.querySelector('.container, .shell, .po-shell, .weight-card, main');
-      const target = container || document.body;
-      if (nav.parentNode !== target) target.appendChild(nav);
+    // Always ensure nav is a direct child of body, not inside any scrollable container
+    if (nav.parentNode !== document.body) {
+      document.body.appendChild(nav);
     }
+
+    // Remove placeholder if present (it causes the nav to be moved inside container)
+    const placeholder = document.getElementById('dock-placeholder');
+    if (placeholder) placeholder.remove();
   }
 
   function installNavigationMotion() {
