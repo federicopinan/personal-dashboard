@@ -328,18 +328,9 @@
         z-index: 10;
       }
 
-      /* ── Responsive: hide page-specific nav pills and bottom dock on mobile ── */
+      /* ── Responsive: hide page-specific nav pills on mobile ── */
       @media (max-width: 767px) {
         .dash-nav { display: none; }
-        body.pd-has-dock {
-          padding-top: 0 !important;
-          padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
-        }
-        .tabbar {
-          top: auto;
-          bottom: 0;
-          padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
-        }
       }
 
       /* ── Reduced motion ──────────────────────────────────── */
