@@ -680,8 +680,13 @@ html, body {
 </div>
 
 <script>
-(function() {
-  const $ = (id) => document.getElementById(id);
+  const domCache = {};
+  const $ = (id) => {
+    if (!domCache[id]) {
+      domCache[id] = document.getElementById(id);
+    }
+    return domCache[id];
+  };
 
   // ============================================================
   // SUBSTANCE DATABASE — daily water bumps scale with YOUR dose.
@@ -845,47 +850,53 @@ html, body {
     $('dayPillLabel').textContent = dows[d.getDay()] + ', ' + mons[d.getMonth()] + ' ' + d.getDate();
   }
 
+  let renderWaterPending = false;
   function renderWater() {
-    const calc = computeTargetMl();
-    const targetUnits = Math.ceil(calc.total / unitVolMl());
-    const count = todayCount();
-    const unitName = unitLabelPlural();
+    if (renderWaterPending) return;
+    renderWaterPending = true;
+    requestAnimationFrame(() => {
+      renderWaterPending = false;
+      const calc = computeTargetMl();
+      const targetUnits = Math.ceil(calc.total / unitVolMl());
+      const count = todayCount();
+      const unitName = unitLabelPlural();
 
-    $('waterUnitLabel').textContent = unitName.toUpperCase() + ' DRANK TODAY';
-    if (window.animateNumber) {
-      window.animateNumber($('waterNum'), count, 400, "int");
-    } else {
-      $('waterNum').textContent = count;
-    }
-    $('waterTarget').textContent = '/ ' + targetUnits;
-    $('waterPlusLabel').textContent = 'Drank a ' + unitLabelSingular();
+      $('waterUnitLabel').textContent = unitName.toUpperCase() + ' DRANK TODAY';
+      if (window.animateNumber) {
+        window.animateNumber($('waterNum'), count, 400, "int");
+      } else {
+        $('waterNum').textContent = count;
+      }
+      $('waterTarget').textContent = '/ ' + targetUnits;
+      $('waterPlusLabel').textContent = 'Drank a ' + unitLabelSingular();
 
-    // Progress bar with three zones: low (0-65%), healthy (65-100%), over (100-150%)
-    const pctRaw = (count / targetUnits) * 100;
-    const fillPct = Math.min(150, pctRaw) / 1.5;   // bar represents 0-150%
-    const fill = $('waterBarFill');
-    fill.style.width = fillPct + '%';
-    fill.classList.toggle('over', pctRaw > 100);
-    $('waterBarMin').textContent = '0';
-    $('waterBarMax').textContent = (Math.ceil(targetUnits * 1.5)) + '+';
-    // Healthy zone bands at 65% and 100%
-    $('waterBarZoneStart').style.left = (65 / 1.5) + '%';
-    $('waterBarZoneEnd').style.left   = (100 / 1.5) + '%';
+      // Progress bar with three zones: low (0-65%), healthy (65-100%), over (100-150%)
+      const pctRaw = (count / targetUnits) * 100;
+      const fillPct = Math.min(150, pctRaw) / 1.5;   // bar represents 0-150%
+      const fill = $('waterBarFill');
+      fill.style.width = fillPct + '%';
+      fill.classList.toggle('over', pctRaw > 100);
+      $('waterBarMin').textContent = '0';
+      $('waterBarMax').textContent = (Math.ceil(targetUnits * 1.5)) + '+';
+      // Healthy zone bands at 65% and 100%
+      $('waterBarZoneStart').style.left = (65 / 1.5) + '%';
+      $('waterBarZoneEnd').style.left   = (100 / 1.5) + '%';
 
-    // Helper text
-    const helper = $('waterHelper');
-    if (count === 0) { helper.textContent = 'Start the day — first one in.'; helper.classList.remove('good'); }
-    else if (pctRaw < 50) { helper.textContent = 'Behind pace — drink one in the next hour.'; helper.classList.remove('good'); }
-    else if (pctRaw < 100) { helper.textContent = (targetUnits - count) + ' to go. Pacing well.'; helper.classList.remove('good'); }
-    else if (pctRaw < 130) { helper.textContent = '✓ Target hit — top up if you train this evening.'; helper.classList.add('good'); }
-    else { helper.textContent = 'Strong — way past target.'; helper.classList.add('good'); }
+      // Helper text
+      const helper = $('waterHelper');
+      if (count === 0) { helper.textContent = 'Start the day — first one in.'; helper.classList.remove('good'); }
+      else if (pctRaw < 50) { helper.textContent = 'Behind pace — drink one in the next hour.'; helper.classList.remove('good'); }
+      else if (pctRaw < 100) { helper.textContent = (targetUnits - count) + ' to go. Pacing well.'; helper.classList.remove('good'); }
+      else if (pctRaw < 130) { helper.textContent = '✓ Target hit — top up if you train this evening.'; helper.classList.add('good'); }
+      else { helper.textContent = 'Strong — way past target.'; helper.classList.add('good'); }
 
-    // Disable minus when at zero
-    $('waterMinusBtn').disabled = count <= 0;
+      // Disable minus when at zero
+      $('waterMinusBtn').disabled = count <= 0;
 
-    renderWhy(calc, targetUnits);
-    renderHistory();
-    renderSparkline(targetUnits);
+      renderWhy(calc, targetUnits);
+      renderHistory();
+      renderSparkline(targetUnits);
+    });
   }
 
   function renderWhy(calc, targetUnits) {

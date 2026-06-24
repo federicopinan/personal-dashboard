@@ -103,7 +103,9 @@ function loadDashboardShell(pathname = '/index.html') {
     dispatchEvent(event) {
       events.push(event);
     },
-    addEventListener() {},
+    addEventListener(type, handler) {
+      document.addEventListener(type, handler);
+    },
     matchMedia() {
       return { matches: false };
     },
@@ -198,10 +200,9 @@ async function main() {
   assert.strictEqual(waterSnapshot.customTarget, true, 'custom water goals are marked for Home copy');
 
   document.dispatch('DOMContentLoaded');
-  const dock = containerAppended.find((element) => element.tagName === 'NAV' && element.className === 'tabbar');
+  const dock = appended.find((element) => element.tagName === 'NAV' && element.className === 'tabbar');
   assert.ok(dock, 'dashboard shell renders the dock');
-  assert.strictEqual(dock.parentNode, mainContainer, 'dock fallback renders inside the main page container, not body');
-  assert.strictEqual(appended.length, 0, 'dock fallback does not append to body when a main container exists');
+  assert.strictEqual(dock.parentNode, document.body, 'dock renders as a direct child of body');
   const dockHrefs = [...dock.innerHTML.matchAll(/href="([^"]+)"/g)].map((match) => match[1]);
   assert.deepStrictEqual(dockHrefs, ['index.html', 'gym.html', 'water.html', 'weight.html', 'sleep.html', 'finance.html'], 'dock renderer outputs exactly the six required destinations');
 
@@ -212,6 +213,41 @@ async function main() {
   });
   assert.ok(!appShell.includes('supplements.html'), 'APP_SHELL intentionally omits supplements.html (outside shared dock)');
   assert.strictEqual(new Set(appShell).size, appShell.length, 'APP_SHELL does not duplicate precache entries');
+
+  // Test storage memoization
+  assert.ok(state.storageCache, 'storageCache Map is exposed');
+  state.storageCache.clear();
+  
+  // Set in localStorage directly to bypass write cache
+  context.localStorage.setItem('test_cache_key', JSON.stringify({ a: 1 }));
+  
+  const val1 = state.readJSON('test_cache_key', null);
+  assert.strictEqual(JSON.stringify(val1), JSON.stringify({ a: 1 }), 'reads from localStorage initially');
+  assert.ok(state.storageCache.has('test_cache_key'), 'value is cached');
+  
+  // Modify localStorage directly (simulate out-of-cache state)
+  context.localStorage.setItem('test_cache_key', JSON.stringify({ a: 2 }));
+  
+  const val2 = state.readJSON('test_cache_key', null);
+  assert.strictEqual(JSON.stringify(val2), JSON.stringify({ a: 1 }), 'reads from cache map on consecutive read, ignoring direct localStorage update');
+  
+  // Write via DashboardState
+  state.writeJSON('test_cache_key', { a: 3 });
+  const cachedVal = state.storageCache.get('test_cache_key');
+  assert.strictEqual(JSON.stringify(cachedVal), JSON.stringify({ a: 3 }), 'updates cache map on writeJSON');
+  assert.strictEqual(context.localStorage.getItem('test_cache_key'), JSON.stringify({ a: 3 }), 'updates localStorage on writeJSON');
+  
+  // Dispatch dashboard-data-changed to invalidate
+  document.dispatch('dashboard-data-changed', { detail: { key: 'test_cache_key' } });
+  assert.ok(!state.storageCache.has('test_cache_key'), 'dashboard-data-changed event invalidates cache');
+  
+  // Repopulate
+  state.readJSON('test_cache_key', null);
+  assert.ok(state.storageCache.has('test_cache_key'), 're-cached');
+  
+  // Dispatch storage event to invalidate
+  document.dispatch('storage', { key: 'test_cache_key' });
+  assert.ok(!state.storageCache.has('test_cache_key'), 'storage event invalidates cache');
 
   console.log('dashboard-shell regression tests passed');
 }

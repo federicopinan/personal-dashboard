@@ -2814,11 +2814,22 @@
     <script src="subscriptions.js"></script>
     <script>
       (function () {
+        const domCache = {};
+        const $ = (id) => {
+          if (!domCache[id]) {
+            domCache[id] = document.getElementById(id);
+          }
+          return domCache[id];
+        };
+
         // ============================================================
         // STORAGE — localStorage shim. Same interface as the dashboard's
         // storeGet/storeSet so the existing render code drops straight in.
         // ============================================================
         function storeGet(key) {
+          if (window.DashboardState) {
+            return window.DashboardState.readJSON(key, null);
+          }
           try {
             const raw = localStorage.getItem(key);
             return raw == null ? null : JSON.parse(raw);
@@ -2827,6 +2838,10 @@
           }
         }
         function storeSet(key, value) {
+          if (window.DashboardState) {
+            window.DashboardState.writeJSON(key, value);
+            return;
+          }
           try {
             localStorage.setItem(key, JSON.stringify(value));
           } catch (e) {}
@@ -2930,9 +2945,9 @@
             addId: "otherAddBtn",
           },
         ];
-        const currencyEl = document.getElementById("netWorthCurrency");
-        const netWorthTotal = document.getElementById("netWorthTotal");
-        const netWorthBreakdown = document.getElementById("netWorthBreakdown");
+        const currencyEl = $("netWorthCurrency");
+        const netWorthTotal = $("netWorthTotal");
+        const netWorthBreakdown = $("netWorthBreakdown");
 
         const exchangeRates = { ARS: 1, USD: 1 / 890 };
         function coerceCurrency(currency) {
@@ -2955,7 +2970,7 @@
 
         function renderNetWorthCategory(cat) {
           const items = storeGet("nw:" + cat.key) || [];
-          const list = document.getElementById(cat.listId);
+          const list = $(cat.listId);
           if (!list) return 0;
           list.innerHTML = "";
           let total = 0;
@@ -2999,7 +3014,7 @@
             row.appendChild(del);
             list.appendChild(row);
           });
-          const totalEl = document.getElementById(cat.totalId);
+          const totalEl = $(cat.totalId);
           if (window.animateNumber) {
             window.animateNumber(totalEl, total, 400, "currency");
           } else {
@@ -3104,32 +3119,38 @@
           input.addEventListener("blur", save);
         }
 
+        let renderAllNetWorthPending = false;
         function renderAllNetWorth() {
-          let grand = 0;
-          const breakdown = [];
-          const sliceTotals = {};
-          NW_CATS.forEach((cat) => {
-            const sub = renderNetWorthCategory(cat);
-            grand += sub;
-            sliceTotals[cat.key] = sub;
-            if (sub > 0) breakdown.push(cat.key + ": " + fmtMoney(sub));
-          });
-          if (netWorthTotal) {
-            if (window.animateNumber) {
-              window.animateNumber(netWorthTotal, grand, 400, "currency");
-            } else {
-              netWorthTotal.textContent = fmtMoney(grand);
+          if (renderAllNetWorthPending) return;
+          renderAllNetWorthPending = true;
+          requestAnimationFrame(() => {
+            renderAllNetWorthPending = false;
+            let grand = 0;
+            const breakdown = [];
+            const sliceTotals = {};
+            NW_CATS.forEach((cat) => {
+              const sub = renderNetWorthCategory(cat);
+              grand += sub;
+              sliceTotals[cat.key] = sub;
+              if (sub > 0) breakdown.push(cat.key + ": " + fmtMoney(sub));
+            });
+            if (netWorthTotal) {
+              if (window.animateNumber) {
+                window.animateNumber(netWorthTotal, grand, 400, "currency");
+              } else {
+                netWorthTotal.textContent = fmtMoney(grand);
+              }
             }
-          }
-          if (netWorthBreakdown)
-            netWorthBreakdown.textContent = breakdown.join("  •  ");
-          logNetWorthSnapshot(grand);
-          renderNetWorthChart();
-          renderAllocationDonut(sliceTotals, grand);
-          renderActivity();
-          if (typeof renderWishlist === "function") renderWishlist();
-          if (typeof renderOrders === "function") renderOrders();
-          if (typeof updateOrdPreview === "function") updateOrdPreview();
+            if (netWorthBreakdown)
+              netWorthBreakdown.textContent = breakdown.join("  •  ");
+            logNetWorthSnapshot(grand);
+            renderNetWorthChart();
+            renderAllocationDonut(sliceTotals, grand);
+            renderActivity();
+            if (typeof renderWishlist === "function") renderWishlist();
+            if (typeof renderOrders === "function") renderOrders();
+            if (typeof updateOrdPreview === "function") updateOrdPreview();
+          });
         }
 
         // ============================================================
@@ -3189,9 +3210,9 @@
           return mons[d.getMonth()] + " " + d.getDate();
         }
         function renderActivity() {
-          const list = document.getElementById("nwActivityList");
-          const empty = document.getElementById("nwActivityEmpty");
-          const count = document.getElementById("nwActivityCount");
+          const list = $("nwActivityList");
+          const empty = $("nwActivityEmpty");
+          const count = $("nwActivityCount");
           if (!list) return;
           const arr = (storeGet(ACTIVITY_KEY) || [])
             .slice()
@@ -3309,11 +3330,11 @@
           );
         }
         function renderAllocationDonut(catTotals, grand) {
-          const svg = document.getElementById("nwDonutSvg");
-          const total = document.getElementById("nwDonutTotal");
-          const empty = document.getElementById("nwDonutEmpty");
-          const legend = document.getElementById("nwDonutLegend");
-          const count = document.getElementById("nwDonutCount");
+          const svg = $("nwDonutSvg");
+          const total = $("nwDonutTotal");
+          const empty = $("nwDonutEmpty");
+          const legend = $("nwDonutLegend");
+          const count = $("nwDonutCount");
           if (!svg || !total || !legend) return;
 
           // Build one slice per individual NW account, colored by parent category.
@@ -3466,11 +3487,11 @@
           return d.join(" ");
         }
         function renderNetWorthChart() {
-          const wrap = document.getElementById("nwChartWrap");
-          const svg = document.getElementById("nwChartSvg");
-          const linePath = document.getElementById("nwChartLine");
-          const areaPath = document.getElementById("nwChartArea");
-          const deltaEl = document.getElementById("nwChartDelta");
+          const wrap = $("nwChartWrap");
+          const svg = $("nwChartSvg");
+          const linePath = $("nwChartLine");
+          const areaPath = $("nwChartArea");
+          const deltaEl = $("nwChartDelta");
           if (!wrap || !svg || !linePath || !areaPath) return;
           const hist = storeGet(NW_HISTORY_KEY) || [];
           if (hist.length < 1) {
@@ -3577,10 +3598,10 @@
         // Stats overlay — what 1% is worth, all-time high/low, snapshot count.
         // Reads the snapshot history (ARS storage) and converts to display currency.
         function renderChartStats(hist) {
-          const oneEl = document.getElementById("nwStat1pct");
-          const highEl = document.getElementById("nwStatHigh");
-          const lowEl = document.getElementById("nwStatLow");
-          const countEl = document.getElementById("nwStatCount");
+          const oneEl = $("nwStat1pct");
+          const highEl = $("nwStatHigh");
+          const lowEl = $("nwStatLow");
+          const countEl = $("nwStatCount");
           if (!oneEl) return;
           if (!hist || !hist.length) {
             oneEl.textContent = "—";
@@ -3600,9 +3621,9 @@
         }
 
         NW_CATS.forEach((cat) => {
-          const addBtn = document.getElementById(cat.addId);
-          const nameInput = document.getElementById(cat.nameId);
-          const amtInput = document.getElementById(cat.amtId);
+          const addBtn = $(cat.addId);
+          const nameInput = $(cat.nameId);
+          const amtInput = $(cat.amtId);
           if (!addBtn) return;
           function doAdd() {
             const n = nameInput.value.trim();
@@ -3644,15 +3665,15 @@
         // ============================================================
         // SUBSCRIPTIONS
         // ============================================================
-        const subsList = document.getElementById("subsList");
-        const subsEmpty = document.getElementById("subsEmpty");
-        const subsTotal = document.getElementById("subsTotal");
-        const subsYearly = document.getElementById("subsYearly");
-        const subsCount = document.getElementById("subsCount");
-        const subAddBtn = document.getElementById("subAddBtn");
-        const subName = document.getElementById("subName");
-        const subAmount = document.getElementById("subAmount");
-        const subPeriod = document.getElementById("subPeriod");
+        const subsList = $("subsList");
+        const subsEmpty = $("subsEmpty");
+        const subsTotal = $("subsTotal");
+        const subsYearly = $("subsYearly");
+        const subsCount = $("subsCount");
+        const subAddBtn = $("subAddBtn");
+        const subName = $("subName");
+        const subAmount = $("subAmount");
+        const subPeriod = $("subPeriod");
 
         function monthlyEquivalent(item) {
           const a = Number(item.amount) || 0;
@@ -3879,7 +3900,7 @@
         // mirroring the same source-of-truth used by the orders form.
         // ============================================================
         function populateSubFromSelect() {
-          const sel = document.getElementById("subFromCat");
+          const sel = $("subFromCat");
           if (!sel) return;
           const prev = sel.value;
           const accounts =
@@ -4128,13 +4149,13 @@
 
         function doSubAdd() {
           try {
-            const nEl = document.getElementById("subName");
-            const aEl = document.getElementById("subAmount");
-            const ccEl = document.getElementById("subCurrency");
-            const pEl = document.getElementById("subPeriod");
-            const rEl = document.getElementById("subRenewal");
-            const fEl = document.getElementById("subFromCat");
-            const tEl = document.getElementById("subAutoDeduct");
+            const nEl = $("subName");
+            const aEl = $("subAmount");
+            const ccEl = $("subCurrency");
+            const pEl = $("subPeriod");
+            const rEl = $("subRenewal");
+            const fEl = $("subFromCat");
+            const tEl = $("subAutoDeduct");
             if (!nEl || !aEl) return;
             const n = (nEl.value || "").trim();
             const aRaw = parseFloat(aEl.value);
@@ -4223,13 +4244,13 @@
           return "bad";
         }
         function renderWishlist() {
-          const wishList = document.getElementById("wishList");
-          const wishEmpty = document.getElementById("wishEmpty");
-          const wishTotalEl = document.getElementById("wishTotal");
-          const wishPctEl = document.getElementById("wishPctOfNw");
-          const wishCountEl = document.getElementById("wishCount");
-          const heroPctEl = document.getElementById("wishPctOfNwHero");
-          const heroFill = document.getElementById("wishHeroFill");
+          const wishList = $("wishList");
+          const wishEmpty = $("wishEmpty");
+          const wishTotalEl = $("wishTotal");
+          const wishPctEl = $("wishPctOfNw");
+          const wishCountEl = $("wishCount");
+          const heroPctEl = $("wishPctOfNwHero");
+          const heroFill = $("wishHeroFill");
           if (!wishList) return;
           const items = storeGet("wishlist") || [];
           const grand = nwGrandARS();
@@ -4349,9 +4370,9 @@
         }
         function doWishAdd() {
           try {
-            const nEl = document.getElementById("wishName");
-            const aEl = document.getElementById("wishAmount");
-            const cEl = document.getElementById("wishCurrency");
+            const nEl = $("wishName");
+            const aEl = $("wishAmount");
+            const cEl = $("wishCurrency");
             if (!nEl || !aEl) return;
             const n = (nEl.value || "").trim();
             const aRaw = parseFloat(aEl.value);
@@ -4380,8 +4401,8 @@
           }
         }
         // Add button uses inline onclick + delegation. Enter on the inputs:
-        const _wishName = document.getElementById("wishName");
-        const _wishAmount = document.getElementById("wishAmount");
+        const _wishName = $("wishName");
+        const _wishAmount = $("wishAmount");
         if (_wishName)
           _wishName.addEventListener("keydown", (e) => {
             if (e.key === "Enter") doWishAdd();
@@ -4488,7 +4509,7 @@
         // Refill the order add-form's "From" select with the user's actual NW
         // accounts, preserving the current selection if that account still exists.
         function populateOrdFromSelect() {
-          const sel = document.getElementById("ordFromCat");
+          const sel = $("ordFromCat");
           if (!sel) return;
           const accounts = listAllNwAccounts();
           const prev = sel.value;
@@ -4517,9 +4538,9 @@
             sel.value = prev;
         }
         function renderOrders() {
-          const list = document.getElementById("ordList");
-          const empty = document.getElementById("ordEmpty");
-          const count = document.getElementById("ordCount");
+          const list = $("ordList");
+          const empty = $("ordEmpty");
+          const count = $("ordCount");
           if (!list) return;
           // Refresh the "From" dropdown so newly added/renamed/deleted NW accounts show up.
           populateOrdFromSelect();
@@ -4798,10 +4819,10 @@
         }
         // Live preview on the add card — updates as user types the cost
         function updateOrdPreview() {
-          const costEl = document.getElementById("ordCost");
-          const ccyEl = document.getElementById("ordCurrency");
-          const fromEl = document.getElementById("ordFromCat");
-          const prev = document.getElementById("ordAddPreview");
+          const costEl = $("ordCost");
+          const ccyEl = $("ordCurrency");
+          const fromEl = $("ordFromCat");
+          const prev = $("ordAddPreview");
           if (!prev) return;
           const aRaw = parseFloat(costEl && costEl.value);
           if (!costEl || isNaN(aRaw) || aRaw <= 0) {
@@ -4842,11 +4863,11 @@
         }
         function doOrdAdd() {
           try {
-            const nEl = document.getElementById("ordName");
-            const aEl = document.getElementById("ordCost");
-            const cEl = document.getElementById("ordCurrency");
-            const fEl = document.getElementById("ordFromCat");
-            const dEl = document.getElementById("ordArrival");
+            const nEl = $("ordName");
+            const aEl = $("ordCost");
+            const cEl = $("ordCurrency");
+            const fEl = $("ordFromCat");
+            const dEl = $("ordArrival");
             if (!nEl || !aEl) return;
             const n = (nEl.value || "").trim();
             const aRaw = parseFloat(aEl.value);
@@ -4887,12 +4908,12 @@
         window.__addOrder = doOrdAdd;
         // Wire live-preview listeners
         ["ordCost", "ordCurrency", "ordFromCat"].forEach((id) => {
-          const el = document.getElementById(id);
+          const el = $(id);
           if (el) el.addEventListener("input", updateOrdPreview);
           if (el) el.addEventListener("change", updateOrdPreview);
         });
         ["ordName", "ordCost"].forEach((id) => {
-          const el = document.getElementById(id);
+          const el = $(id);
           if (el)
             el.addEventListener("keydown", (e) => {
               if (e.key === "Enter") doOrdAdd();
@@ -4982,9 +5003,9 @@
           wrap.classList.toggle("urgent", !!(cur && cur.days <= 5));
         }
         function renderTicker() {
-          const wrap = document.getElementById("financeTicker");
-          const stream = document.getElementById("tickerStream");
-          const dots = document.getElementById("tickerDots");
+          const wrap = $("financeTicker");
+          const stream = $("tickerStream");
+          const dots = $("tickerDots");
           if (!wrap || !stream || !dots) return;
           const entries = buildTickerEntries();
           const sig = tickerSig(entries);
@@ -5057,9 +5078,9 @@
             tickerTimer = setInterval(() => {
               if (!tickerLastEntries.length) return;
               tickerIdx = (tickerIdx + 1) % tickerLastEntries.length;
-              const w = document.getElementById("financeTicker");
-              const s = document.getElementById("tickerStream");
-              const d = document.getElementById("tickerDots");
+              const w = $("financeTicker");
+              const s = $("tickerStream");
+              const d = $("tickerDots");
               if (w && s && d) paintTickerActive(w, s, d, tickerLastEntries);
             }, 5000);
           }

@@ -1818,11 +1818,23 @@
 
   <script src="currency-migration.js"></script>
   <script>
+    // DOM selector cache registry
+    const domCache = {};
+    const $ = (id) => {
+      if (!domCache[id]) {
+        domCache[id] = document.getElementById(id);
+      }
+      return domCache[id];
+    };
+
     const WAKE_HOUR = 8;
     const SLEEP_HOUR = 24;
 
     // Storage helpers
     function storeGet(key) {
+      if (window.DashboardState) {
+        return window.DashboardState.readJSON(key, null);
+      }
       try {
         const v = localStorage.getItem(key);
         return v ? JSON.parse(v) : null;
@@ -1830,6 +1842,13 @@
     }
 
     function storeSet(key, value) {
+      if (window.DashboardState) {
+        window.DashboardState.writeJSON(key, value);
+        if (key.startsWith('goals:')) {
+          window.dispatchEvent(new CustomEvent('goals-changed'));
+        }
+        return;
+      }
       localStorage.setItem(key, JSON.stringify(value));
       if (key.startsWith('goals:')) {
         window.dispatchEvent(new CustomEvent('goals-changed'));
@@ -1838,6 +1857,11 @@
     }
 
     function storeDelete(key) {
+      if (window.DashboardState) {
+        localStorage.removeItem(key);
+        window.DashboardState.notifyChange(key);
+        return;
+      }
       localStorage.removeItem(key);
       window.dispatchEvent(new CustomEvent('dashboard-data-changed'));
     }
@@ -1847,8 +1871,8 @@
       const now = new Date();
       const clock = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
       const date = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-      const clockEl = document.getElementById('hubClock');
-      const dateEl = document.getElementById('hubDate');
+      const clockEl = $('hubClock');
+      const dateEl = $('hubDate');
       if (clockEl) clockEl.textContent = clock;
       if (dateEl) dateEl.textContent = date;
     }
@@ -1897,72 +1921,78 @@
     }
 
     function qaNote() {
-      document.getElementById('noteInput').focus();
+      $('noteInput').focus();
     }
 
     function qaSleep() {
       window.location.href = 'sleep.html';
     }
 
+    let renderSnapshotPending = false;
     function renderSnapshot() {
-      if (window.currencyMigration) window.currencyMigration.runMigration();
-      if (window.DashboardSubscriptions) {
-        window.DashboardSubscriptions.migrateLegacySubsToV1();
-      }
-      const goals = storeGet('goals:' + getActiveDateString()) || [];
-      const goalsDone = goals.filter(g => g.done).length;
+      if (renderSnapshotPending) return;
+      renderSnapshotPending = true;
+      requestAnimationFrame(() => {
+        renderSnapshotPending = false;
+        if (window.currencyMigration) window.currencyMigration.runMigration();
+        if (window.DashboardSubscriptions) {
+          window.DashboardSubscriptions.migrateLegacySubsToV1();
+        }
+        const goals = storeGet('goals:' + getActiveDateString()) || [];
+        const goalsDone = goals.filter(g => g.done).length;
 
-      const waterSnapshot = window.DashboardState
-        ? window.DashboardState.getWaterSnapshot(new Date())
-        : { count: 0, targetUnits: 1, customTarget: false };
-      const waterToday = waterSnapshot.count;
-      const waterTarget = waterSnapshot.targetUnits;
+        const waterSnapshot = window.DashboardState
+          ? window.DashboardState.getWaterSnapshot(new Date())
+          : { count: 0, targetUnits: 1, customTarget: false };
+        const waterToday = waterSnapshot.count;
+        const waterTarget = waterSnapshot.targetUnits;
 
-      const sleepSnapshot = window.DashboardState
-        ? window.DashboardState.getSleepSnapshot(new Date())
-        : { today: null, recent: [], average: 0 };
-      const sleepToday = sleepSnapshot.today;
-      const sleepRecent = sleepSnapshot.recent;
-      const sleepAvg = sleepSnapshot.average;
+        const sleepSnapshot = window.DashboardState
+          ? window.DashboardState.getSleepSnapshot(new Date())
+          : { today: null, recent: [], average: 0 };
+        const sleepToday = sleepSnapshot.today;
+        const sleepRecent = sleepSnapshot.recent;
+        const sleepAvg = sleepSnapshot.average;
 
-      const weightState = storeGet('po_weight_v1') || { logs: [] };
-      const weightLogs = Array.isArray(weightState.logs) ? weightState.logs.slice().sort((a, b) => a.date.localeCompare(b.date)) : [];
-      const latestWeight = weightLogs[weightLogs.length - 1] || null;
-      const prevWeight = weightLogs.length > 1 ? weightLogs[weightLogs.length - 2] : null;
-      const weightDelta = latestWeight && prevWeight ? latestWeight.weight - prevWeight.weight : 0;
+        const weightState = storeGet('po_weight_v1') || { logs: [] };
+        const weightLogs = Array.isArray(weightState.logs) ? weightState.logs.slice().sort((a, b) => a.date.localeCompare(b.date)) : [];
+        const latestWeight = weightLogs[weightLogs.length - 1] || null;
+        const prevWeight = weightLogs.length > 1 ? weightLogs[weightLogs.length - 2] : null;
+        const weightDelta = latestWeight && prevWeight ? latestWeight.weight - prevWeight.weight : 0;
 
-      const gymDone = !!((storeGet('po_coach_workout_done') || {})[getActiveDateString()]);
-      const coachState = storeGet('po_coach_v1') || {};
-      const exerciseCount = Array.isArray(coachState.exercises) ? coachState.exercises.length : 0;
+        const gymDone = !!((storeGet('po_coach_workout_done') || {})[getActiveDateString()]);
+        const coachState = storeGet('po_coach_v1') || {};
+        const exerciseCount = Array.isArray(coachState.exercises) ? coachState.exercises.length : 0;
 
-      const nwCats = ['bank', 'stocks', 'crypto', 'other'];
-      let netWorth = 0;
-      for (const cat of nwCats) {
-        const items = storeGet('nw:' + cat) || [];
-        netWorth += items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-      }
-      const subs = window.DashboardSubscriptions ? window.DashboardSubscriptions.listSubscriptions() : (storeGet('subscriptions:v1') || []);
-      const incomingOrders = storeGet('incoming_orders') || [];
+        const nwCats = ['bank', 'stocks', 'crypto', 'other'];
+        let netWorth = 0;
+        for (const cat of nwCats) {
+          const items = storeGet('nw:' + cat) || [];
+          netWorth += items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+        }
+        const subs = window.DashboardSubscriptions ? window.DashboardSubscriptions.listSubscriptions() : (storeGet('subscriptions:v1') || []);
+        const incomingOrders = storeGet('incoming_orders') || [];
 
-      document.getElementById('summaryWater').textContent = waterToday + ' / ' + waterTarget;
-      document.getElementById('summaryWater').className = 'summary-item-value' + (waterToday >= waterTarget ? ' good' : waterToday >= Math.ceil(waterTarget * 0.5) ? ' warn' : '');
-      document.getElementById('summaryWaterNote').textContent = waterSnapshot.customTarget ? 'custom daily goal' : 'today target';
+        $('summaryWater').textContent = waterToday + ' / ' + waterTarget;
+        $('summaryWater').className = 'summary-item-value' + (waterToday >= waterTarget ? ' good' : waterToday >= Math.ceil(waterTarget * 0.5) ? ' warn' : '');
+        $('summaryWaterNote').textContent = waterSnapshot.customTarget ? 'custom daily goal' : 'today target';
 
-      document.getElementById('summarySleep').textContent = sleepToday ? sleepToday.hours.toFixed(1) + 'h' : 'No log';
-      document.getElementById('summarySleep').className = 'summary-item-value' + (sleepToday && sleepToday.hours >= 7 ? ' good' : sleepToday ? ' warn' : '');
-      document.getElementById('summarySleepNote').textContent = sleepRecent.length ? '7d avg ' + sleepAvg.toFixed(1) + 'h' : 'log last night';
+        $('summarySleep').textContent = sleepToday ? sleepToday.hours.toFixed(1) + 'h' : 'No log';
+        $('summarySleep').className = 'summary-item-value' + (sleepToday && sleepToday.hours >= 7 ? ' good' : sleepToday ? ' warn' : '');
+        $('summarySleepNote').textContent = sleepRecent.length ? '7d avg ' + sleepAvg.toFixed(1) + 'h' : 'log last night';
 
-      document.getElementById('summaryWeight').textContent = latestWeight ? Number(latestWeight.weight).toFixed(1) + ' kg' : 'No log';
-      document.getElementById('summaryWeight').className = 'summary-item-value';
-      document.getElementById('summaryWeightNote').textContent = prevWeight ? ((weightDelta >= 0 ? '+' : '') + weightDelta.toFixed(1) + ' kg vs previous') : 'latest entry';
+        $('summaryWeight').textContent = latestWeight ? Number(latestWeight.weight).toFixed(1) + ' kg' : 'No log';
+        $('summaryWeight').className = 'summary-item-value';
+        $('summaryWeightNote').textContent = prevWeight ? ((weightDelta >= 0 ? '+' : '') + weightDelta.toFixed(1) + ' kg vs previous') : 'latest entry';
 
-      document.getElementById('summaryGym').textContent = gymDone ? 'Done' : 'Pending';
-      document.getElementById('summaryGym').className = 'summary-item-value' + (gymDone ? ' good' : ' warn');
-      document.getElementById('summaryGymNote').textContent = exerciseCount ? exerciseCount + ' exercises tracked' : 'open coach';
+        $('summaryGym').textContent = gymDone ? 'Done' : 'Pending';
+        $('summaryGym').className = 'summary-item-value' + (gymDone ? ' good' : ' warn');
+        $('summaryGymNote').textContent = exerciseCount ? exerciseCount + ' exercises tracked' : 'open coach';
 
-      document.getElementById('summaryFinance').textContent = netWorth > 0 ? '$ ' + Math.round(netWorth).toLocaleString('en-US') : 'No accounts';
-      document.getElementById('summaryFinance').className = 'summary-item-value';
-      document.getElementById('summaryFinanceNote').textContent = incomingOrders.length + ' orders · ' + subs.length + ' subs';
+        $('summaryFinance').textContent = netWorth > 0 ? '$ ' + Math.round(netWorth).toLocaleString('en-US') : 'No accounts';
+        $('summaryFinance').className = 'summary-item-value';
+        $('summaryFinanceNote').textContent = incomingOrders.length + ' orders · ' + subs.length + ' subs';
+      });
     }
 
     function collectDashboardBackup() {
@@ -2058,54 +2088,60 @@
       return `rgb(${r},${g},${b})`;
     }
 
+    let updateDayRingPending = false;
     function updateDayRing() {
-      const now = new Date();
-      const hours = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
-      const pctEl = document.getElementById('dayRingPct');
-      const phaseEl = document.getElementById('dayRingPhase');
-      const statusEl = document.getElementById('dayRingStatus');
-      const remainingEl = document.getElementById('dayRingRemaining');
-      const fillEl = document.getElementById('dayRingFill');
+      if (updateDayRingPending) return;
+      updateDayRingPending = true;
+      requestAnimationFrame(() => {
+        updateDayRingPending = false;
+        const now = new Date();
+        const hours = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+        const pctEl = $('dayRingPct');
+        const phaseEl = $('dayRingPhase');
+        const statusEl = $('dayRingStatus');
+        const remainingEl = $('dayRingRemaining');
+        const fillEl = $('dayRingFill');
 
-      if (hours < WAKE_HOUR) {
-        pctEl.textContent = '—';
-        phaseEl.textContent = 'SLEEPING';
-        statusEl.textContent = '😴 Still sleeping';
-        const wakeDate = new Date(); wakeDate.setHours(WAKE_HOUR, 0, 0, 0);
-        const diffMs = wakeDate - now;
-        const h = Math.floor(diffMs / 3600000);
-        const m = Math.floor((diffMs % 3600000) / 60000);
-        remainingEl.textContent = `${h}h ${m}m until wake-up`;
-        fillEl.setAttribute('stroke-dashoffset', 2 * Math.PI * 52);
-        fillEl.setAttribute('stroke', '#4D4B47');
-      } else if (hours >= SLEEP_HOUR) {
-        pctEl.textContent = '100';
-        phaseEl.textContent = 'PAST BEDTIME';
-        statusEl.textContent = '⚠️ Past bedtime';
-        remainingEl.textContent = 'Sleep!';
-        fillEl.setAttribute('stroke-dashoffset', 0);
-        fillEl.setAttribute('stroke', '#E25D7A');
-      } else {
-        const percent = (hours - WAKE_HOUR) / (SLEEP_HOUR - WAKE_HOUR) * 100;
-        const displayPct = Math.round(percent);
-        pctEl.textContent = displayPct + '%';
-        fillEl.setAttribute('stroke', interpolateColor(percent));
-        const circumference = 2 * Math.PI * 52;
-        fillEl.setAttribute('stroke-dasharray', circumference);
-        fillEl.setAttribute('stroke-dashoffset', circumference * (1 - percent / 100));
-        let phase, status;
-        if (percent < 25) { phase = 'MORNING'; status = '☀️ Morning — fresh start'; }
-        else if (percent < 50) { phase = 'MIDDAY'; status = '⚡ Midday — keep moving'; }
-        else if (percent < 75) { phase = 'AFTERNOON'; status = '🔥 Afternoon — push it'; }
-        else if (percent < 90) { phase = 'EVENING'; status = '⏳ Evening — wrap up'; }
-        else { phase = 'BEDTIME'; status = '🌙 Bedtime soon'; }
-        phaseEl.textContent = phase;
-        statusEl.textContent = status;
-        const remainingHours = SLEEP_HOUR - hours;
-        const rh = Math.floor(remainingHours);
-        const rm = Math.floor((remainingHours - rh) * 60);
-        remainingEl.textContent = `${rh}h ${rm}m awake time left`;
-      }
+        if (hours < WAKE_HOUR) {
+          pctEl.textContent = '—';
+          phaseEl.textContent = 'SLEEPING';
+          statusEl.textContent = '😴 Still sleeping';
+          const wakeDate = new Date(); wakeDate.setHours(WAKE_HOUR, 0, 0, 0);
+          const diffMs = wakeDate - now;
+          const h = Math.floor(diffMs / 3600000);
+          const m = Math.floor((diffMs % 3600000) / 60000);
+          remainingEl.textContent = `${h}h ${m}m until wake-up`;
+          fillEl.setAttribute('stroke-dashoffset', 2 * Math.PI * 52);
+          fillEl.setAttribute('stroke', '#4D4B47');
+        } else if (hours >= SLEEP_HOUR) {
+          pctEl.textContent = '100';
+          phaseEl.textContent = 'PAST BEDTIME';
+          statusEl.textContent = '⚠️ Past bedtime';
+          remainingEl.textContent = 'Sleep!';
+          fillEl.setAttribute('stroke-dashoffset', 0);
+          fillEl.setAttribute('stroke', '#E25D7A');
+        } else {
+          const percent = (hours - WAKE_HOUR) / (SLEEP_HOUR - WAKE_HOUR) * 100;
+          const displayPct = Math.round(percent);
+          pctEl.textContent = displayPct + '%';
+          fillEl.setAttribute('stroke', interpolateColor(percent));
+          const circumference = 2 * Math.PI * 52;
+          fillEl.setAttribute('stroke-dasharray', circumference);
+          fillEl.setAttribute('stroke-dashoffset', circumference * (1 - percent / 100));
+          let phase, status;
+          if (percent < 25) { phase = 'MORNING'; status = '☀️ Morning — fresh start'; }
+          else if (percent < 50) { phase = 'MIDDAY'; status = '⚡ Midday — keep moving'; }
+          else if (percent < 75) { phase = 'AFTERNOON'; status = '🔥 Afternoon — push it'; }
+          else if (percent < 90) { phase = 'EVENING'; status = '⏳ Evening — wrap up'; }
+          else { phase = 'BEDTIME'; status = '🌙 Bedtime soon'; }
+          phaseEl.textContent = phase;
+          statusEl.textContent = status;
+          const remainingHours = SLEEP_HOUR - hours;
+          const rh = Math.floor(remainingHours);
+          const rm = Math.floor((remainingHours - rh) * 60);
+          remainingEl.textContent = `${rh}h ${rm}m awake time left`;
+        }
+      });
     }
 
     // ── Goals (Today only, simplified) ───────────────────
@@ -2189,17 +2225,17 @@
 
     function renderStreak() {
       const streak = storeGet('goal_streak_v1') || { count: 0 };
-      const numEl = document.getElementById('gmStreakNum');
+      const numEl = $('gmStreakNum');
       if (numEl) numEl.textContent = streak.count;
     }
 
     function renderTodayHeader(goals) {
       const done = goals.filter(g => g.done).length;
       const total = goals.length;
-      const numEl = document.getElementById('gmProgressNum');
-      const totalEl = document.getElementById('gmProgressTotal');
-      const labelEl = document.getElementById('gmProgressLabel');
-      const card = document.getElementById('todayCard');
+      const numEl = $('gmProgressNum');
+      const totalEl = $('gmProgressTotal');
+      const labelEl = $('gmProgressLabel');
+      const card = $('todayCard');
       if (window.animateNumber) {
         window.animateNumber(numEl, done);
       } else {
@@ -2211,14 +2247,14 @@
       else labelEl.textContent = 'complete';
       if (done > 0 && done === total) card.classList.add('gm-all-done');
       else card.classList.remove('gm-all-done');
-      const bar = document.getElementById('gmBar');
+      const bar = $('gmBar');
       bar.innerHTML = '';
       for (let i = 0; i < goals.length; i++) {
         const seg = document.createElement('div');
         seg.className = 'gm-bar-seg' + (goals[i].done ? ' gm-bar-seg-done' : '');
         bar.appendChild(seg);
       }
-      const empty = document.getElementById('emptyState');
+      const empty = $('emptyState');
       empty.style.display = goals.length === 0 ? 'block' : 'none';
     }
 
@@ -2286,7 +2322,7 @@
           // Update header progress counter & bar dynamically without full list rebuild
           const done = goals.filter(g => g.done).length;
           const total = goals.length;
-          const numEl = document.getElementById('gmProgressNum');
+          const numEl = $('gmProgressNum');
           if (numEl) {
             if (window.animateNumber) {
               window.animateNumber(numEl, done);
@@ -2294,11 +2330,11 @@
               numEl.textContent = done;
             }
           }
-          const totalEl = document.getElementById('gmProgressTotal');
+          const totalEl = $('gmProgressTotal');
           if (totalEl) totalEl.textContent = '/ ' + total;
 
-          const labelEl = document.getElementById('gmProgressLabel');
-          const card = document.getElementById('todayCard');
+          const labelEl = $('gmProgressLabel');
+          const card = $('todayCard');
           if (labelEl) {
             if (total === 0) labelEl.textContent = 'no goals yet';
             else if (done === total) labelEl.textContent = 'all done — solid day';
@@ -2309,7 +2345,7 @@
             else card.classList.remove('gm-all-done');
           }
 
-          const bar = document.getElementById('gmBar');
+          const bar = $('gmBar');
           if (bar) {
             bar.innerHTML = '';
             for (let i = 0; i < goals.length; i++) {
@@ -2342,17 +2378,17 @@
     function loadToday() {
       const dateStr = getActiveDateString();
       const goals = storeGet('goals:' + dateStr) || [];
-      document.getElementById('todayLabel').textContent = 'Today — ' + formatDateLabel(dateStr);
+      $('todayLabel').textContent = 'Today — ' + formatDateLabel(dateStr);
       renderTodayHeader(goals);
-      renderListInto(goals, document.getElementById('goalList'), document.getElementById('emptyState'), 'goals:' + dateStr);
+      renderListInto(goals, $('goalList'), $('emptyState'), 'goals:' + dateStr);
       loadTomorrow();
     }
 
     function loadTomorrow() {
       const dateStr = getTomorrowDateString();
       const goals = storeGet('goals:' + dateStr) || [];
-      document.getElementById('tomorrowLabel').textContent = 'Tomorrow — ' + formatDateLabel(dateStr);
-      renderListInto(goals, document.getElementById('tomorrowList'), document.getElementById('tomorrowEmpty'), 'goals:' + dateStr);
+      $('tomorrowLabel').textContent = 'Tomorrow — ' + formatDateLabel(dateStr);
+      renderListInto(goals, $('tomorrowList'), $('tomorrowEmpty'), 'goals:' + dateStr);
     }
 
     // ── Bookmarks ───────────────────────────────────────
@@ -2368,7 +2404,7 @@
     }
 
     function renderBookmarks() {
-      const grid = document.getElementById('bookmarksGrid');
+      const grid = $('bookmarksGrid');
       let bookmarks = storeGet('hub_bookmarks');
       if (!bookmarks) {
         storeSet('hub_bookmarks', DEFAULT_BOOKMARKS);
@@ -2402,23 +2438,23 @@
     }
 
     function openBookmarkModal() {
-      document.getElementById('bookmarkModal').classList.remove('hidden');
-      document.getElementById('bmName').value = '';
-      document.getElementById('bmUrl').value = '';
-      document.getElementById('bmName').focus();
+      $('bookmarkModal').classList.remove('hidden');
+      $('bmName').value = '';
+      $('bmUrl').value = '';
+      $('bmName').focus();
     }
 
     function closeBookmarkModal() {
-      document.getElementById('bookmarkModal').classList.add('hidden');
+      $('bookmarkModal').classList.add('hidden');
     }
 
     function closeBookmarkModalOnOverlay(e) {
-      if (e.target === document.getElementById('bookmarkModal')) closeBookmarkModal();
+      if (e.target === $('bookmarkModal')) closeBookmarkModal();
     }
 
     function saveBookmark() {
-      const name = document.getElementById('bmName').value.trim();
-      let url = document.getElementById('bmUrl').value.trim();
+      const name = $('bmName').value.trim();
+      let url = $('bmUrl').value.trim();
       if (!name || !url) return;
       if (!url.startsWith('http')) url = 'https://' + url;
       const bookmarks = storeGet('hub_bookmarks') || [];
@@ -2440,7 +2476,7 @@
       return WHEATHER_ICONS[condition] || '🌤️';
     }
     function fetchWeather() {
-      const widget = document.getElementById('weatherWidget');
+      const widget = $('weatherWidget');
       if (!widget) return;
       widget.innerHTML = '<div class="weather-loading" style="flex:1;text-align:center;padding:8px">Updating weather…</div>';
       navigator.geolocation.getCurrentPosition(
@@ -2504,7 +2540,7 @@
 
     // ── Quick Notes ───────────────────────────────────────
     function renderNotes() {
-      const list = document.getElementById('notesList');
+      const list = $('notesList');
       const notes = storeGet('hub_notes') || [];
       list.innerHTML = '';
       const showCount = 5;
@@ -2565,13 +2601,13 @@
     setInterval(updateHubClock, 30 * 1000);
 
     // Note add handler
-    document.getElementById('noteAddBtn').addEventListener('click', addNote);
-    document.getElementById('noteInput').addEventListener('keydown', e => {
+    $('noteAddBtn').addEventListener('click', addNote);
+    $('noteInput').addEventListener('keydown', e => {
       if (e.key === 'Enter') addNote();
     });
 
     function addNote() {
-      const input = document.getElementById('noteInput');
+      const input = $('noteInput');
       const text = input.value.trim();
       if (!text) return;
       const now = new Date();
@@ -2585,8 +2621,8 @@
     }
 
     // Goal add handler
-    document.getElementById('goalAddBtn').addEventListener('click', () => {
-      const input = document.getElementById('goalInput');
+    $('goalAddBtn').addEventListener('click', () => {
+      const input = $('goalInput');
       const text = input.value.trim();
       if (!text) return;
       const goals = storeGet('goals:' + getActiveDateString()) || [];
@@ -2597,9 +2633,9 @@
       renderSnapshot();
     });
 
-    document.getElementById('goalInput').addEventListener('keydown', e => {
+    $('goalInput').addEventListener('keydown', e => {
       if (e.key === 'Enter') {
-        const input = document.getElementById('goalInput');
+        const input = $('goalInput');
         const text = input.value.trim();
         if (!text) return;
         const goals = storeGet('goals:' + getActiveDateString()) || [];
@@ -2611,8 +2647,8 @@
       }
     });
 
-    document.getElementById('tomorrowAddBtn').addEventListener('click', function() {
-      var input = document.getElementById('tomorrowInput');
+    $('tomorrowAddBtn').addEventListener('click', function() {
+      var input = $('tomorrowInput');
       var text = input.value.trim();
       if (!text) return;
       var tGoals = storeGet('goals:' + getTomorrowDateString()) || [];
@@ -2622,15 +2658,15 @@
       loadTomorrow();
       renderSnapshot();
     });
-    document.getElementById('tomorrowInput').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') document.getElementById('tomorrowAddBtn').click();
+    $('tomorrowInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') $('tomorrowAddBtn').click();
     });
 
-    document.getElementById('summaryGymBtn').addEventListener('click', qaGym);
-    document.getElementById('backupBtn').addEventListener('click', exportDashboardData);
-    document.getElementById('exportDataBtn').addEventListener('click', exportDashboardData);
-    document.getElementById('importDataBtn').addEventListener('click', () => document.getElementById('importFileInput').click());
-    document.getElementById('importFileInput').addEventListener('change', (e) => {
+    $('summaryGymBtn').addEventListener('click', qaGym);
+    $('backupBtn').addEventListener('click', exportDashboardData);
+    $('exportDataBtn').addEventListener('click', exportDashboardData);
+    $('importDataBtn').addEventListener('click', () => $('importFileInput').click());
+    $('importFileInput').addEventListener('change', (e) => {
       const file = e.target.files && e.target.files[0];
       if (file) importDashboardData(file);
       e.target.value = '';

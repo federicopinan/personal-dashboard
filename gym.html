@@ -3228,7 +3228,13 @@
                 // ============================================================
                 // HELPERS
                 // ============================================================
-                const $ = (id) => document.getElementById(id);
+                const domCache = {};
+                const $ = (id) => {
+                    if (!domCache[id]) {
+                        domCache[id] = document.getElementById(id);
+                    }
+                    return domCache[id];
+                };
                 function unit() {
                     return state.units;
                 }
@@ -3886,28 +3892,34 @@
                     row.dataset.value = String(active);
                 }
 
+                let renderAllPending = false;
                 function renderAll() {
-                    renderDayPill();
-                    renderFilters();
-                    renderSelect();
-                    renderForm();
-                    renderLastSet();
-                    renderRepsRow();
-                    renderRx();
-                    renderStats();
-                    renderSparkline();
-                    renderHistory();
-                    renderTodaysWorkout();
-                    renderPastWorkouts();
-                    // Pre-fill weight input with last logged weight (or starting weight)
-                    const ex = getCurrentEx();
-                    if (ex && !ex.bw) {
-                        const logs = getLogs();
-                        const w = logs.length
-                            ? logs[logs.length - 1].weight
-                            : ex.startWeight || 0;
-                        $("weightInput").value = w;
-                    }
+                    if (renderAllPending) return;
+                    renderAllPending = true;
+                    requestAnimationFrame(() => {
+                        renderAllPending = false;
+                        renderDayPill();
+                        renderFilters();
+                        renderSelect();
+                        renderForm();
+                        renderLastSet();
+                        renderRepsRow();
+                        renderRx();
+                        renderStats();
+                        renderSparkline();
+                        renderHistory();
+                        renderTodaysWorkout();
+                        renderPastWorkouts();
+                        // Pre-fill weight input with last logged weight (or starting weight)
+                        const ex = getCurrentEx();
+                        if (ex && !ex.bw) {
+                            const logs = getLogs();
+                            const w = logs.length
+                                ? logs[logs.length - 1].weight
+                                : ex.startWeight || 0;
+                            $("weightInput").value = w;
+                        }
+                    });
                 }
 
                 // ============================================================

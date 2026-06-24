@@ -286,6 +286,13 @@ body::after {
 <script>
 (() => {
   'use strict';
+  const domCache = {};
+  const $ = (id) => {
+    if (!domCache[id]) {
+      domCache[id] = document.getElementById(id);
+    }
+    return domCache[id];
+  };
   const SK = 'po_sleep_v1';
   const storeGet = () => window.DashboardState ? window.DashboardState.getSleepLogs() : (() => { try { return JSON.parse(localStorage.getItem(SK)) || []; } catch { return []; } })();
   const storeSet = (v) => {
@@ -327,129 +334,135 @@ body::after {
 
   function hydrateForm(log) {
     if (!log) return;
-    document.getElementById('bedtime').value = log.bed || '23:00';
-    document.getElementById('wakeup').value = log.wake || '07:00';
+    $('bedtime').value = log.bed || '23:00';
+    $('wakeup').value = log.wake || '07:00';
     quality = log.quality || 'good';
     qBtns.forEach((btn) => btn.classList.toggle('active', btn.dataset.q === quality));
   }
 
+  let renderPending = false;
   function render() {
-    const logs = storeGet();
-    const today = todayKey();
-    const todayLog = logs.find(l => l.date === today);
-    const numEl = document.getElementById('sleepNum');
-    const qualEl = document.getElementById('sleepQual');
+    if (renderPending) return;
+    renderPending = true;
+    requestAnimationFrame(() => {
+      renderPending = false;
+      const logs = storeGet();
+      const today = todayKey();
+      const todayLog = logs.find(l => l.date === today);
+      const numEl = $('sleepNum');
+      const qualEl = $('sleepQual');
 
-    if (todayLog) {
-      numEl.textContent = todayLog.hours.toFixed(1);
-      qualEl.textContent = qualLabel(todayLog.quality);
-      qualEl.className = 'sleep-quality ' + qualClass(todayLog.quality);
-    } else {
-      numEl.textContent = '—';
-      qualEl.textContent = 'Not logged';
-      qualEl.className = 'sleep-quality none';
-    }
+      if (todayLog) {
+        numEl.textContent = todayLog.hours.toFixed(1);
+        qualEl.textContent = qualLabel(todayLog.quality);
+        qualEl.className = 'sleep-quality ' + qualClass(todayLog.quality);
+      } else {
+        numEl.textContent = '—';
+        qualEl.textContent = 'Not logged';
+        qualEl.className = 'sleep-quality none';
+      }
 
-    // 7-day avg
-    const recent = logs.slice(-7);
-    const avgEl = document.getElementById('avgVal');
-    if (recent.length > 0) {
-      const avg = recent.reduce((s, l) => s + l.hours, 0) / recent.length;
-      avgEl.textContent = avg.toFixed(1) + ' hrs';
-    } else {
-      avgEl.textContent = '—';
-    }
-    const debtEl = document.getElementById('debtVal');
-    const targetEl = document.getElementById('targetVal');
-    if (recent.length > 0) {
-      const total = recent.reduce((s, l) => s + l.hours, 0);
-      const debt = Math.max(0, recent.length * 8 - total);
-      const hitDays = recent.filter((l) => l.hours >= 8).length;
-      debtEl.textContent = debt === 0 ? '0.0h' : debt.toFixed(1) + 'h';
-      debtEl.className = 'metric-value' + (debt <= 1 ? ' good' : debt <= 4 ? ' warn' : '');
-      targetEl.textContent = hitDays + '/' + recent.length + ' days';
-      targetEl.className = 'metric-value' + (hitDays >= Math.ceil(recent.length * 0.6) ? ' good' : ' warn');
-    } else {
-      debtEl.textContent = '—';
-      debtEl.className = 'metric-value';
-      targetEl.textContent = '—';
-      targetEl.className = 'metric-value';
-    }
+      // 7-day avg
+      const recent = logs.slice(-7);
+      const avgEl = $('avgVal');
+      if (recent.length > 0) {
+        const avg = recent.reduce((s, l) => s + l.hours, 0) / recent.length;
+        avgEl.textContent = avg.toFixed(1) + ' hrs';
+      } else {
+        avgEl.textContent = '—';
+      }
+      const debtEl = $('debtVal');
+      const targetEl = $('targetVal');
+      if (recent.length > 0) {
+        const total = recent.reduce((s, l) => s + l.hours, 0);
+        const debt = Math.max(0, recent.length * 8 - total);
+        const hitDays = recent.filter((l) => l.hours >= 8).length;
+        debtEl.textContent = debt === 0 ? '0.0h' : debt.toFixed(1) + 'h';
+        debtEl.className = 'metric-value' + (debt <= 1 ? ' good' : debt <= 4 ? ' warn' : '');
+        targetEl.textContent = hitDays + '/' + recent.length + ' days';
+        targetEl.className = 'metric-value' + (hitDays >= Math.ceil(recent.length * 0.6) ? ' good' : ' warn');
+      } else {
+        debtEl.textContent = '—';
+        debtEl.className = 'metric-value';
+        targetEl.textContent = '—';
+        targetEl.className = 'metric-value';
+      }
 
-    // Sparkline
-    const last14 = logs.slice(-14);
-    const svg = document.getElementById('sparkSvg');
-    svg.innerHTML = '';
-    if (last14.length >= 2) {
-      const W = 280, H = 70, pad = 8;
-      const vals = last14.map(l => l.hours);
-      const mn = Math.min(...vals) - 0.5, mx = Math.max(...vals) + 0.5;
-      const pts = vals.map((v, i) => {
-        const x = pad + (i / (vals.length - 1)) * (W - pad * 2);
-        const y = H - pad - ((v - mn) / (mx - mn)) * (H - pad * 2);
-        return [x, y];
-      });
-      const line = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
-      const area = line + ` L${pts[pts.length-1][0].toFixed(1)} ${H} L${pts[0][0].toFixed(1)} ${H} Z`;
-
-      const grad = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-      grad.innerHTML = `<linearGradient id="sFill" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.25"/>
-        <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
-      </linearGradient>`;
-      svg.appendChild(grad);
-
-      const aPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      aPath.setAttribute('d', area);
-      aPath.setAttribute('fill', 'url(#sFill)');
-      svg.appendChild(aPath);
-
-      const lPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      lPath.setAttribute('d', line);
-      lPath.setAttribute('fill', 'none');
-      lPath.setAttribute('stroke', '#a78bfa');
-      lPath.setAttribute('stroke-width', '2');
-      lPath.setAttribute('stroke-linecap', 'round');
-      lPath.setAttribute('stroke-linejoin', 'round');
-      svg.appendChild(lPath);
-
-      pts.forEach(p => {
-        const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        c.setAttribute('cx', p[0]); c.setAttribute('cy', p[1]); c.setAttribute('r', '3');
-        c.setAttribute('fill', '#a78bfa');
-        svg.appendChild(c);
-      });
-    }
-
-    // History
-    const histEl = document.getElementById('histList');
-    if (last14.length === 0) {
-      histEl.innerHTML = '<div class="hist-empty">No sleep logged yet.</div>';
-    } else {
-      histEl.innerHTML = [...last14].reverse().map(l => `
-        <div class="hist-item">
-          <span class="hist-date">${l.date}</span>
-          <span class="hist-hours">${l.hours.toFixed(1)} hrs</span>
-          <span class="hist-qual ${qualClass(l.quality)}">${qualLabel(l.quality)}</span>
-          <button class="hist-del" data-date="${l.date}" title="Delete">×</button>
-        </div>
-      `).join('');
-      histEl.querySelectorAll('.hist-del').forEach(b => {
-        b.addEventListener('click', () => {
-          if (!confirm('Delete this entry?')) return;
-          const logs2 = storeGet().filter(l => l.date !== b.dataset.date);
-          storeSet(logs2);
-          render();
+      // Sparkline
+      const last14 = logs.slice(-14);
+      const svg = $('sparkSvg');
+      svg.innerHTML = '';
+      if (last14.length >= 2) {
+        const W = 280, H = 70, pad = 8;
+        const vals = last14.map(l => l.hours);
+        const mn = Math.min(...vals) - 0.5, mx = Math.max(...vals) + 0.5;
+        const pts = vals.map((v, i) => {
+          const x = pad + (i / (vals.length - 1)) * (W - pad * 2);
+          const y = H - pad - ((v - mn) / (mx - mn)) * (H - pad * 2);
+          return [x, y];
         });
-      });
-    }
+        const line = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+        const area = line + ` L${pts[pts.length-1][0].toFixed(1)} ${H} L${pts[0][0].toFixed(1)} ${H} Z`;
 
-    hydrateForm(todayLog || logs[logs.length - 1]);
+        const grad = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        grad.innerHTML = `<linearGradient id="sFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+        </linearGradient>`;
+        svg.appendChild(grad);
+
+        const aPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        aPath.setAttribute('d', area);
+        aPath.setAttribute('fill', 'url(#sFill)');
+        svg.appendChild(aPath);
+
+        const lPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        lPath.setAttribute('d', line);
+        lPath.setAttribute('fill', 'none');
+        lPath.setAttribute('stroke', '#a78bfa');
+        lPath.setAttribute('stroke-width', '2');
+        lPath.setAttribute('stroke-linecap', 'round');
+        lPath.setAttribute('stroke-linejoin', 'round');
+        svg.appendChild(lPath);
+
+        pts.forEach(p => {
+          const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          c.setAttribute('cx', p[0]); c.setAttribute('cy', p[1]); c.setAttribute('r', '3');
+          c.setAttribute('fill', '#a78bfa');
+          svg.appendChild(c);
+        });
+      }
+
+      // History
+      const histEl = $('histList');
+      if (last14.length === 0) {
+        histEl.innerHTML = '<div class="hist-empty">No sleep logged yet.</div>';
+      } else {
+        histEl.innerHTML = [...last14].reverse().map(l => `
+          <div class="hist-item">
+            <span class="hist-date">${l.date}</span>
+            <span class="hist-hours">${l.hours.toFixed(1)} hrs</span>
+            <span class="hist-qual ${qualClass(l.quality)}">${qualLabel(l.quality)}</span>
+            <button class="hist-del" data-date="${l.date}" title="Delete">×</button>
+          </div>
+        `).join('');
+        histEl.querySelectorAll('.hist-del').forEach(b => {
+          b.addEventListener('click', () => {
+            if (!confirm('Delete this entry?')) return;
+            const logs2 = storeGet().filter(l => l.date !== b.dataset.date);
+            storeSet(logs2);
+            render();
+          });
+        });
+      }
+
+      hydrateForm(todayLog || logs[logs.length - 1]);
+    });
   }
 
-  document.getElementById('saveBtn').addEventListener('click', () => {
-    const bed = document.getElementById('bedtime').value;
-    const wake = document.getElementById('wakeup').value;
+  $('saveBtn').addEventListener('click', () => {
+    const bed = $('bedtime').value;
+    const wake = $('wakeup').value;
     if (!bed || !wake) return;
     const hours = calcHours(bed, wake);
     const key = todayKey();

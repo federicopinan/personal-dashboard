@@ -22,9 +22,9 @@ rules:
   apply:
     - Follow existing code patterns
     tdd: false
-    test_command: ""
+    test_command: "node dashboard-shell.test.js"
   verify:
-    test_command: ""
+    test_command: "node dashboard-shell.test.js"
     build_command: ""
     coverage_threshold: 0
   archive:
@@ -32,8 +32,8 @@ rules:
 
 testing:
   strict_tdd: false
-  runner: null
-  unit: false
+  runner: "node"
+  unit: true
   integration: false
   e2e: false
   coverage: false

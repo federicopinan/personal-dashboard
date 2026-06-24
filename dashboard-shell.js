@@ -26,23 +26,49 @@
     { label: 'Finance', href: 'finance.html', icon: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>' },
   ];
 
+  const storageCache = new Map();
+
   function readJSON(key, fallback) {
+    if (storageCache.has(key)) {
+      return storageCache.get(key);
+    }
     try {
       const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
+      const val = raw ? JSON.parse(raw) : fallback;
+      storageCache.set(key, val);
+      return val;
     } catch (_) {
       return fallback;
     }
   }
 
   function writeJSON(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
-    notifyChange(key);
+    try {
+      storageCache.set(key, value);
+      localStorage.setItem(key, JSON.stringify(value));
+      notifyChange(key);
+    } catch (_) {
+      // Graceful error handling for quota exceptions
+    }
   }
 
   function notifyChange(key) {
     window.dispatchEvent(new CustomEvent('dashboard-data-changed', { detail: { key } }));
   }
+
+  window.addEventListener('storage', (event) => {
+    if (event.key) {
+      storageCache.delete(event.key);
+    } else {
+      storageCache.clear();
+    }
+  });
+
+  window.addEventListener('dashboard-data-changed', (event) => {
+    if (event.detail && event.detail.key) {
+      storageCache.delete(event.detail.key);
+    }
+  });
 
   function localDateKey(date = new Date()) {
     return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
@@ -203,6 +229,7 @@
         pointer-events: none;
       }
       .tabbar-inner {
+        view-transition-name: main-navigation;
         pointer-events: auto;
         display: flex;
         width: 100%; max-width: 500px;
@@ -249,9 +276,70 @@
       }
       .tab-icon svg { width: 100%; height: 100%; display: block; }
 
-      /* ── Responsive: hide page-specific nav pills on mobile ── */
+      /* ── Cascade entrance animations ────────────────────── */
+      .cascade-item {
+        opacity: 0;
+        transform: translateY(12px);
+        animation: pdStaggerCascadeEnter 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        animation-delay: calc(var(--stagger-index, 0) * 45ms);
+      }
+      @keyframes pdStaggerCascadeEnter {
+        from {
+          opacity: 0;
+          transform: translateY(12px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* ── Touch Target expansions (44x44px minimum) ──────── */
+      .goal-checkbox,
+      .goal-delete,
+      [data-action="del"],
+      [data-action="toggle"],
+      [data-action="low"],
+      .wt-delete,
+      .delete-btn,
+      .remove-btn,
+      .se-delete,
+      .wish-delete {
+        position: relative;
+      }
+      .goal-checkbox::before,
+      .goal-delete::before,
+      [data-action="del"]::before,
+      [data-action="toggle"]::before,
+      [data-action="low"]::before,
+      .wt-delete::before,
+      .delete-btn::before,
+      .remove-btn::before,
+      .se-delete::before,
+      .wish-delete::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 44px;
+        height: 44px;
+        transform: translate(-50%, -50%);
+        cursor: pointer;
+        z-index: 10;
+      }
+
+      /* ── Responsive: hide page-specific nav pills and bottom dock on mobile ── */
       @media (max-width: 767px) {
         .dash-nav { display: none; }
+        body.pd-has-dock {
+          padding-top: 0 !important;
+          padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
+        }
+        .tabbar {
+          top: auto;
+          bottom: 0;
+          padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+        }
       }
 
       /* ── Reduced motion ──────────────────────────────────── */
@@ -259,6 +347,11 @@
         ::view-transition-old(root), ::view-transition-new(root),
         body.pd-page-enter, body.pd-page-leave { animation: none !important; clip-path: none !important; }
         *, *::before, *::after { scroll-behavior: auto !important; }
+        .cascade-item {
+          animation: none !important;
+          opacity: 1 !important;
+          transform: none !important;
+        }
       }
     `;
     document.head.appendChild(style);
@@ -292,14 +385,36 @@
 
   function installNavigationMotion() {
     document.addEventListener('click', (event) => {
-      const link = event.target.closest && event.target.closest('a.tab[href]');
+      const link = event.target.closest && event.target.closest('a[href]');
       if (!link) return;
+
+      // Screen out modifier keys and non-left-clicks
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
       const url = new URL(link.href, location.href);
-      if (url.origin !== location.origin || url.pathname === location.pathname) return;
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (url.origin !== location.origin) return; // External Origin
+      if (link.getAttribute('target') === '_blank') return; // New tab
+
+      // Hash/anchor links referencing the current page
+      if (url.pathname === location.pathname && url.hash !== '') return;
+
+      // If native view transitions are supported, the browser manages the page switch smoothly.
+      // We let the navigation happen immediately.
+      if ('startViewTransition' in document) {
+        return;
+      }
+
+      // If reduced motion is preferred, bypass the artificial transition delay
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        return;
+      }
+
+      // Fallback transition
       event.preventDefault();
       document.body.classList.add('pd-page-leave');
-      setTimeout(() => { window.location.href = link.href; }, 130);
+      setTimeout(() => {
+        window.location.href = link.href;
+      }, 130);
     });
   }
 
@@ -323,12 +438,23 @@
     getSleepLogs,
     setSleepLogs,
     getSleepSnapshot,
+    storageCache,
   };
+
+  function applyCascadeStagger() {
+    if (typeof document.querySelectorAll !== 'function') return;
+    const targets = document.querySelectorAll('.cascade-item, .summary-card, .section, .gm-card');
+    targets.forEach((el, index) => {
+      el.style.setProperty('--stagger-index', index);
+      el.classList.add('cascade-item');
+    });
+  }
 
   document.addEventListener('DOMContentLoaded', () => {
     installShellStyles();
     renderDock();
     installNavigationMotion();
+    applyCascadeStagger();
     requestAnimationFrame(() => document.body.classList.add('pd-page-enter'));
     notifyChange('dashboard-shell-ready');
   });
