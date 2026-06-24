@@ -1185,7 +1185,11 @@ html, body {
 <style>
 /* === iPhone bottom-safe-area fix ===
    The Done button in the settings modal + the bottom of the page were
-    getting blocked by the iPhone home indicator. */
+   getting blocked by the iPhone home indicator. These rules add
+   safe-area padding so nothing sits under it. */
+.shell {
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+}
 .modal-bg {
   padding-bottom: max(20px, env(safe-area-inset-bottom));
   padding-top: max(20px, env(safe-area-inset-top));
