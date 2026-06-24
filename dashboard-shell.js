@@ -258,8 +258,10 @@
     const placeholder = document.getElementById('dock-placeholder');
     if (placeholder && placeholder.parentNode) {
       placeholder.parentNode.replaceChild(nav, placeholder);
-    } else if (!nav.parentNode) {
-      document.body.appendChild(nav);
+    } else {
+      const container = document.querySelector('.container, .shell, .po-shell, .weight-card, main');
+      const target = container || document.body;
+      if (nav.parentNode !== target) target.appendChild(nav);
     }
   }
 

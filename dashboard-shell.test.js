@@ -50,6 +50,13 @@ function loadDashboardShell(pathname = '/index.html') {
   const listeners = {};
   const elementsById = new Map();
   const appended = [];
+  const containerAppended = [];
+  const mainContainer = createElement('div');
+  mainContainer.className = 'shell';
+  mainContainer.appendChild = function appendChild(element) {
+    element.parentNode = this;
+    containerAppended.push(element);
+  };
   const document = {
     head: {
       appendChild(element) {
@@ -75,7 +82,10 @@ function loadDashboardShell(pathname = '/index.html') {
       return elementsById.get(id) || null;
     },
     querySelector(selector) {
-      if (selector === 'nav.tabbar') return appended.find((element) => element.tagName === 'NAV' && element.className === 'tabbar') || null;
+      if (selector === 'nav.tabbar') {
+        return [...containerAppended, ...appended].find((element) => element.tagName === 'NAV' && element.className === 'tabbar') || null;
+      }
+      if (selector === '.container, .shell, .po-shell, .weight-card, main') return mainContainer;
       return null;
     },
     addEventListener(type, handler) {
@@ -117,7 +127,7 @@ function loadDashboardShell(pathname = '/index.html') {
   };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'dashboard-shell.js'), 'utf8'), context, { filename: 'dashboard-shell.js' });
-  return { context, document, events, appended };
+  return { context, document, events, appended, containerAppended, mainContainer };
 }
 
 function readCachedAppShell() {
@@ -169,7 +179,7 @@ function readCachedAppShell() {
 }
 
 async function main() {
-  const { context, document, appended } = loadDashboardShell('/water.html');
+  const { context, document, appended, containerAppended, mainContainer } = loadDashboardShell('/water.html');
   const state = context.window.DashboardState;
 
   const localLateNight = new Date(2026, 0, 1, 0, 30, 0);
@@ -188,8 +198,10 @@ async function main() {
   assert.strictEqual(waterSnapshot.customTarget, true, 'custom water goals are marked for Home copy');
 
   document.dispatch('DOMContentLoaded');
-  const dock = appended.find((element) => element.tagName === 'NAV' && element.className === 'tabbar');
+  const dock = containerAppended.find((element) => element.tagName === 'NAV' && element.className === 'tabbar');
   assert.ok(dock, 'dashboard shell renders the dock');
+  assert.strictEqual(dock.parentNode, mainContainer, 'dock fallback renders inside the main page container, not body');
+  assert.strictEqual(appended.length, 0, 'dock fallback does not append to body when a main container exists');
   const dockHrefs = [...dock.innerHTML.matchAll(/href="([^"]+)"/g)].map((match) => match[1]);
   assert.deepStrictEqual(dockHrefs, ['index.html', 'gym.html', 'water.html', 'weight.html', 'sleep.html', 'finance.html'], 'dock renderer outputs exactly the six required destinations');
 
