@@ -2791,22 +2791,10 @@
     </div>
 
     <!-- ===== BOTTOM TAB BAR ===== -->
-    <nav class="bottom-tabs" id="bottomTabs" aria-label="Sections">
+    <nav class="bottom-tabs" id="bottomTabs" aria-label="Sections" style="display: none;">
       <button class="bot-tab active" data-tab="net">
         <span class="bot-tab-icon">📊</span>
         <span class="bot-tab-label">Net Worth</span>
-      </button>
-      <button class="bot-tab" data-tab="subs">
-        <span class="bot-tab-icon">🔁</span>
-        <span class="bot-tab-label">Subs</span>
-      </button>
-      <button class="bot-tab" data-tab="incoming">
-        <span class="bot-tab-icon">📦</span>
-        <span class="bot-tab-label">Orders</span>
-      </button>
-      <button class="bot-tab" data-tab="wish">
-        <span class="bot-tab-icon">🎯</span>
-        <span class="bot-tab-label">Wishlist</span>
       </button>
     </nav>
 
@@ -2889,12 +2877,7 @@
         tabs.forEach((b) =>
           b.addEventListener("click", () => setActiveTab(b.dataset.tab)),
         );
-        const savedTab = storeGet(TAB_KEY);
-        setActiveTab(
-          savedTab && ["net", "subs", "incoming", "wish"].includes(savedTab)
-            ? savedTab
-            : "net",
-        );
+        setActiveTab("net");
 
         // Spotlight card hover tracking
         document.querySelectorAll(".spotlight-card").forEach((card) => {
