@@ -169,13 +169,21 @@
     const style = document.createElement('style');
     style.id = 'dashboardShellStyles';
     style.textContent = `
-      /* ── Page transitions ─────────────────────────────────── */
+      /* ── Page transitions — cascade top-to-bottom ──────────── */
       @view-transition { navigation: auto; }
-      ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 220ms; animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
-      body.pd-page-enter { animation: pdPageEnter 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-      body.pd-page-leave { animation: pdPageLeave 160ms ease both; }
-      @keyframes pdPageEnter { from { opacity: 0; transform: translateY(8px) scale(0.995); filter: blur(2px); } to { opacity: 1; transform: none; filter: none; } }
-      @keyframes pdPageLeave { to { opacity: 0; transform: translateY(-6px) scale(0.995); filter: blur(2px); } }
+      ::view-transition-old(root) { animation: pdCascadeLeave 180ms cubic-bezier(0.4, 0, 1, 1) both; }
+      ::view-transition-new(root) { animation: pdCascadeEnter 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+      body.pd-page-enter { animation: pdCascadeEnter 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+      body.pd-page-leave { animation: pdCascadeLeave 180ms cubic-bezier(0.4, 0, 1, 1) both; }
+      @keyframes pdCascadeEnter {
+        from { opacity: 0; transform: translateY(-28px); clip-path: inset(0 0 100% 0); }
+        40%  { opacity: 1; clip-path: inset(0 0 0% 0); }
+        to   { opacity: 1; transform: translateY(0); clip-path: inset(0 0 0% 0); }
+      }
+      @keyframes pdCascadeLeave {
+        from { opacity: 1; transform: translateY(0); }
+        to   { opacity: 0; transform: translateY(18px); }
+      }
 
       /* ── Dock / Tabbar (fixed top) ───────────────────────── */
       body.pd-has-dock {
@@ -191,9 +199,10 @@
         justify-content: center;
         margin: 0;
         padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px;
-        background: linear-gradient(180deg, rgba(5,5,6,0.96) 0%, rgba(5,5,6,0.82) 62%, rgba(5,5,6,0) 100%);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
+        background: rgba(5,5,6,0.94);
+        backdrop-filter: blur(18px) saturate(1.4);
+        -webkit-backdrop-filter: blur(18px) saturate(1.4);
+        border-bottom: 1px solid rgba(255,255,255,0.04);
         pointer-events: none;
       }
       .tabbar-inner {
@@ -244,7 +253,8 @@
 
       /* ── Reduced motion ──────────────────────────────────── */
       @media (prefers-reduced-motion: reduce) {
-        ::view-transition-old(root), ::view-transition-new(root), body.pd-page-enter, body.pd-page-leave { animation: none !important; }
+        ::view-transition-old(root), ::view-transition-new(root),
+        body.pd-page-enter, body.pd-page-leave { animation: none !important; clip-path: none !important; }
         *, *::before, *::after { scroll-behavior: auto !important; }
       }
     `;
