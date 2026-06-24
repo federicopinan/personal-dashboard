@@ -177,18 +177,27 @@
       @keyframes pdPageEnter { from { opacity: 0; transform: translateY(8px) scale(0.995); filter: blur(2px); } to { opacity: 1; transform: none; filter: none; } }
       @keyframes pdPageLeave { to { opacity: 0; transform: translateY(-6px) scale(0.995); filter: blur(2px); } }
 
-      /* ── Dock / Tabbar (inline in container) ─────────────── */
+      /* ── Dock / Tabbar (fixed top) ───────────────────────── */
+      body.pd-has-dock {
+        padding-top: calc(68px + env(safe-area-inset-top, 0px));
+      }
       .tabbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 50;
         display: flex;
         justify-content: center;
-        margin-top: 24px;
-        margin-bottom: 16px;
-        padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
-        background: linear-gradient(180deg, rgba(5,5,6,0) 0%, rgba(5,5,6,0.82) 38%, rgba(5,5,6,0.96) 100%);
+        margin: 0;
+        padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px;
+        background: linear-gradient(180deg, rgba(5,5,6,0.96) 0%, rgba(5,5,6,0.82) 62%, rgba(5,5,6,0) 100%);
         backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
+        pointer-events: none;
       }
       .tabbar-inner {
+        pointer-events: auto;
         display: flex;
         width: 100%; max-width: 500px;
         gap: 6px; padding: 6px;
@@ -254,6 +263,8 @@
         + item.label
         + '</a>';
     }).join('') + '</div>';
+
+    document.body.classList.add('pd-has-dock');
 
     const placeholder = document.getElementById('dock-placeholder');
     if (placeholder && placeholder.parentNode) {

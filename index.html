@@ -82,8 +82,7 @@
       z-index: 2;
       max-width: 720px;
       margin: 0 auto;
-      padding: 10px 20px calc(90px + env(safe-area-inset-bottom));
-      padding-top: max(52px, env(safe-area-inset-top));
+      padding: 10px 20px calc(24px + env(safe-area-inset-bottom));
     }
 
     .dash-title {
@@ -1490,6 +1489,7 @@
 <body>
   <div class="grain"></div>
   <div class="container">
+    <div id="dock-placeholder"></div>
     <!-- Focus Timer Banner -->
     <div id="focusBanner" class="focus-banner" style="display:none">
       <div class="focus-banner-inner">
@@ -1641,9 +1641,6 @@
       </div>
     </div>
   </div>
-
-  <!-- Dock placeholder -->
-  <div id="dock-placeholder"></div>
 
     <!-- Single Thing -->
     <!-- Goals Summary + Quick Add -->
