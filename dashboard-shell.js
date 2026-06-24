@@ -236,58 +236,6 @@
         .dash-nav { display: none; }
       }
 
-      /* ── Desktop sidebar breakpoint ─────────────────────────── */
-      @media (min-width: 768px) {
-        body {
-          padding-left: 80px;
-        }
-        .tabbar {
-          top: 0; left: 0; right: auto; bottom: 0;
-          width: 80px;
-          padding: 12px 8px calc(12px + env(safe-area-inset-bottom));
-          background: rgba(8,8,10,0.92);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
-          border-right: 1px solid rgba(255,255,255,0.06);
-          justify-content: flex-start;
-          align-items: stretch;
-        }
-        .tabbar-inner {
-          flex-direction: column;
-          max-width: none;
-          width: 100%;
-          gap: 4px;
-          padding: 8px 4px;
-          border-radius: 14px;
-        }
-        .tab {
-          flex: 0 0 auto;
-          padding: 12px 4px;
-          font-size: 8px;
-          gap: 4px;
-          border-radius: 10px;
-        }
-        .tab-icon {
-          width: 24px; height: 24px;
-        }
-      }
-
-      @media (min-width: 1024px) {
-        .tabbar {
-          width: 88px;
-        }
-        body {
-          padding-left: 88px;
-        }
-        .tab {
-          font-size: 9px;
-          padding: 14px 6px;
-        }
-        .tab-icon {
-          width: 26px; height: 26px;
-        }
-      }
-
       /* ── Reduced motion ──────────────────────────────────── */
       @media (prefers-reduced-motion: reduce) {
         ::view-transition-old(root), ::view-transition-new(root), body.pd-page-enter, body.pd-page-leave { animation: none !important; }
