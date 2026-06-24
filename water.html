@@ -21,6 +21,7 @@ Contact: rowan.wisere@gmail.com
 <title>Water Coach</title>
 <link rel="manifest" href="manifest.webmanifest">
 <script src="pwa.js" defer></script>
+<script src="dashboard-shell.js" defer></script>
 
 <!-- =============================================================
      EDIT THIS BLOCK TO MAKE THE APP YOURS.
@@ -670,6 +671,20 @@ html, body {
           <input type="number" id="setGlassMl" min="100" max="500" step="10">
         </div>
       </div>
+      <div class="field">
+        <label>Daily water goal</label>
+        <div class="seg" id="setTargetMode">
+          <button data-u="auto">Auto</button>
+          <button data-u="custom">Custom</button>
+        </div>
+      </div>
+      <div class="field" id="customGoalField">
+        <label>Custom goal (ml per day)</label>
+        <input type="number" id="setDailyGoalMl" min="500" max="10000" step="50" placeholder="e.g. 3000">
+        <div style="font-size:11px;color:var(--text-3);margin-top:4px;line-height:1.4">
+          Home and Water both use this same saved target.
+        </div>
+      </div>
     </div>
 
     <div class="set-section">
@@ -776,6 +791,7 @@ html, body {
   // ============================================================
   const LS_KEY = 'po_water_v1';
   function loadState() {
+    if (window.DashboardState) return window.DashboardState.getWaterState();
     try {
       const raw = localStorage.getItem(LS_KEY);
       if (raw) return normalize(JSON.parse(raw));
@@ -792,9 +808,16 @@ html, body {
     s.caffeineMgPerDay = (s.caffeineMgPerDay != null) ? s.caffeineMgPerDay : (CONFIG.caffeineMgPerDay || 200);
     s.substances = Array.isArray(s.substances) ? s.substances : (CONFIG.defaultSubstances || []);
     s.logs = (s.logs && typeof s.logs === 'object') ? s.logs : {};  // {YYYY-MM-DD: number_of_servings}
+    s.targetMode = s.targetMode === 'custom' ? 'custom' : 'auto';
+    s.dailyGoalMl = Number(s.dailyGoalMl) > 0 ? Number(s.dailyGoalMl) : null;
     return s;
   }
   function saveState() {
+    if (window.DashboardState) {
+      window.DashboardState.setWaterState(state);
+      state = window.DashboardState.getWaterState();
+      return;
+    }
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
   }
   let state = loadState();
@@ -802,6 +825,7 @@ html, body {
 
   // Helpers
   function dateKey(d) {
+    if (window.DashboardState) return window.DashboardState.localDateKey(d);
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   }
   function todayKey() { return dateKey(new Date()); }
@@ -823,6 +847,7 @@ html, body {
   //   adjustments: +200 ml male, +100 ml age 50+
   // ============================================================
   function computeTargetMl() {
+    if (window.DashboardState) return window.DashboardState.computeWaterTargetMl(state);
     const p = state.profile;
     const wKg = state.weightUnit === 'lb' ? p.weightKg / 2.20462 : p.weightKg;
     const base = wKg * 35;
@@ -834,7 +859,8 @@ html, body {
     if ((p.age || 0) >= 50) adjust += 100;
     return {
       base, exercise, caffeine, subs, adjust,
-      total: base + exercise + caffeine + subs + adjust
+      total: state.targetMode === 'custom' && state.dailyGoalMl ? Math.max(500, state.dailyGoalMl) : base + exercise + caffeine + subs + adjust,
+      custom: state.targetMode === 'custom' && !!state.dailyGoalMl
     };
   }
 
@@ -929,7 +955,7 @@ html, body {
     });
     if (calc.adjust > 0)
       html += '<div class="why-row"><span class="why-label">+ Sex / age adjustment</span><span class="why-val">+ ' + fmtMl(calc.adjust) + '</span></div>';
-    html += '<div class="why-row total"><span class="why-label">Daily target</span><span class="why-val">' + fmtMl(calc.total) + ' ≈ ' + targetUnits + ' ' + unitLabelPlural() + '</span></div>';
+    html += '<div class="why-row total"><span class="why-label">Daily target' + (calc.custom ? ' (custom)' : '') + '</span><span class="why-val">' + fmtMl(calc.total) + ' ≈ ' + targetUnits + ' ' + unitLabelPlural() + '</span></div>';
     wrap.innerHTML = html;
   }
 
@@ -1020,10 +1046,13 @@ html, body {
     $('setCaffeine').value = state.caffeineMgPerDay;
     $('setBottleMl').value = state.bottleMl;
     $('setGlassMl').value = state.glassMl;
+    $('setDailyGoalMl').value = state.dailyGoalMl || Math.round(computeAutoTargetTotal());
 
     setSegActive('setUnit', state.unit);
     setSegActive('setWeightUnit', state.weightUnit);
     setSegActive('setSex', state.profile.sex);
+    setSegActive('setTargetMode', state.targetMode);
+    $('customGoalField').style.display = state.targetMode === 'custom' ? 'flex' : 'none';
 
     renderSubsList();
   }
@@ -1046,8 +1075,24 @@ html, body {
   bindSeg('setUnit', 'u', (v) => { state.unit = v; saveState(); renderWater(); });
   bindSeg('setWeightUnit', 'u', (v) => { state.weightUnit = v; saveState(); renderWater(); });
   bindSeg('setSex', 's', (v) => { state.profile.sex = v; saveState(); renderWater(); });
+  bindSeg('setTargetMode', 'u', (v) => {
+    state.targetMode = v;
+    if (v === 'custom' && !state.dailyGoalMl) state.dailyGoalMl = Math.round(computeAutoTargetTotal());
+    saveState();
+    renderSettings();
+    renderWater();
+  });
 
-  ['setWeight','setAge','setActivity','setCaffeine','setBottleMl','setGlassMl'].forEach(id => {
+  function computeAutoTargetTotal() {
+    if (window.DashboardState) return window.DashboardState.computeAutoWaterTargetMl(state).total;
+    const mode = state.targetMode;
+    state.targetMode = 'auto';
+    const total = computeTargetMl().total;
+    state.targetMode = mode;
+    return total;
+  }
+
+  ['setWeight','setAge','setActivity','setCaffeine','setBottleMl','setGlassMl','setDailyGoalMl'].forEach(id => {
     $(id).addEventListener('input', () => {
       const v = parseFloat($(id).value);
       if (id === 'setWeight') state.profile.weightKg = v || 0;
@@ -1056,6 +1101,7 @@ html, body {
       else if (id === 'setCaffeine') state.caffeineMgPerDay = v || 0;
       else if (id === 'setBottleMl') state.bottleMl = v || 500;
       else if (id === 'setGlassMl') state.glassMl = v || 250;
+      else if (id === 'setDailyGoalMl') state.dailyGoalMl = v || null;
       saveState(); renderWater();
     });
   });
