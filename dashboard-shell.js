@@ -177,26 +177,16 @@
       @keyframes pdPageEnter { from { opacity: 0; transform: translateY(8px) scale(0.995); filter: blur(2px); } to { opacity: 1; transform: none; filter: none; } }
       @keyframes pdPageLeave { to { opacity: 0; transform: translateY(-6px) scale(0.995); filter: blur(2px); } }
 
-      /* ── Keep content above the fixed dock ──────────────── */
-      body {
-        padding-bottom: calc(90px + env(safe-area-inset-bottom));
-      }
-
-      /* ── Dock / Tabbar (fixed bottom) ──────────────────── */
+      /* ── Dock / Tabbar (static, end of page) ─────────────── */
       .tabbar {
-        position: fixed;
-        left: 0; right: 0; bottom: 0;
-        z-index: 50;
         display: flex;
         justify-content: center;
         padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
         background: linear-gradient(180deg, rgba(5,5,6,0) 0%, rgba(5,5,6,0.82) 38%, rgba(5,5,6,0.96) 100%);
         backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
-        pointer-events: none;
       }
       .tabbar-inner {
-        pointer-events: auto;
         display: flex;
         width: 100%; max-width: 500px;
         gap: 6px; padding: 6px;
