@@ -1,0 +1,5 @@
+.atl/
+.pi/
+
+.env
+.env.local

@@ -169,12 +169,126 @@
     const style = document.createElement('style');
     style.id = 'dashboardShellStyles';
     style.textContent = `
+      /* ── Page transitions ─────────────────────────────────── */
       @view-transition { navigation: auto; }
       ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 220ms; animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
       body.pd-page-enter { animation: pdPageEnter 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
       body.pd-page-leave { animation: pdPageLeave 160ms ease both; }
       @keyframes pdPageEnter { from { opacity: 0; transform: translateY(8px) scale(0.995); filter: blur(2px); } to { opacity: 1; transform: none; filter: none; } }
       @keyframes pdPageLeave { to { opacity: 0; transform: translateY(-6px) scale(0.995); filter: blur(2px); } }
+
+      /* ── Dock / Tabbar (mobile bottom) ──────────────────── */
+      .tabbar {
+        position: fixed;
+        left: 0; right: 0; bottom: 0;
+        z-index: 50;
+        display: flex;
+        justify-content: center;
+        padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+        background: linear-gradient(180deg, rgba(5,5,6,0) 0%, rgba(5,5,6,0.82) 38%, rgba(5,5,6,0.96) 100%);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        pointer-events: none;
+      }
+      .tabbar-inner {
+        pointer-events: auto;
+        display: flex;
+        width: 100%; max-width: 500px;
+        gap: 6px; padding: 6px;
+        background: rgba(20,20,22,0.72);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 18px;
+        box-shadow: 0 12px 36px rgba(0,0,0,0.55);
+      }
+      .tab {
+        flex: 1 1 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 3px;
+        padding: 9px 4px;
+        border-radius: 13px;
+        font-size: 9px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        color: rgba(255,255,255,0.5);
+        text-decoration: none;
+        background: transparent;
+        border: 1px solid transparent;
+        transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .tab:hover { color: rgba(255,255,255,0.85); }
+      .tab[aria-current="page"] {
+        color: #fff;
+        background: rgba(255,255,255,0.08);
+        border-color: rgba(255,255,255,0.10);
+      }
+      .tab-icon {
+        width: 22px; height: 22px;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .tab-icon svg { width: 100%; height: 100%; display: block; }
+
+      /* ── Responsive: hide page-specific nav pills on mobile ── */
+      @media (max-width: 767px) {
+        .dash-nav { display: none; }
+      }
+
+      /* ── Desktop sidebar breakpoint ─────────────────────────── */
+      @media (min-width: 768px) {
+        body {
+          padding-left: 80px;
+        }
+        .tabbar {
+          top: 0; left: 0; right: auto; bottom: 0;
+          width: 80px;
+          padding: 12px 8px calc(12px + env(safe-area-inset-bottom));
+          background: rgba(8,8,10,0.92);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border-right: 1px solid rgba(255,255,255,0.06);
+          justify-content: flex-start;
+          align-items: stretch;
+        }
+        .tabbar-inner {
+          flex-direction: column;
+          max-width: none;
+          width: 100%;
+          gap: 4px;
+          padding: 8px 4px;
+          border-radius: 14px;
+        }
+        .tab {
+          flex: 0 0 auto;
+          padding: 12px 4px;
+          font-size: 8px;
+          gap: 4px;
+          border-radius: 10px;
+        }
+        .tab-icon {
+          width: 24px; height: 24px;
+        }
+      }
+
+      @media (min-width: 1024px) {
+        .tabbar {
+          width: 88px;
+        }
+        body {
+          padding-left: 88px;
+        }
+        .tab {
+          font-size: 9px;
+          padding: 14px 6px;
+        }
+        .tab-icon {
+          width: 26px; height: 26px;
+        }
+      }
+
+      /* ── Reduced motion ──────────────────────────────────── */
       @media (prefers-reduced-motion: reduce) {
         ::view-transition-old(root), ::view-transition-new(root), body.pd-page-enter, body.pd-page-leave { animation: none !important; }
         *, *::before, *::after { scroll-behavior: auto !important; }
