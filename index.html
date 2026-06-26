@@ -1727,6 +1727,14 @@
       </div>
     </div>
 
+    <div class="section" id="pendingTasksSection">
+      <div class="section-title">Pending</div>
+      <div class="gm-card">
+        <ul class="goal-list gm-list" id="pendingTaskList"></ul>
+        <div class="empty-state" id="pendingTaskEmpty">No overdue tasks.</div>
+      </div>
+    </div>
+
     <!-- Tomorrow Goals -->
     <div class="section">
       <div class="section-title">Tomorrow</div>
@@ -1789,6 +1797,7 @@
     <div class="section">
       <div class="section-title">Notes</div>
       <div class="notes-list" id="notesList"></div>
+      <div class="notes-list" id="noteDetail" style="display:none"></div>
       <div class="gm-input-wrap">
         <input class="goal-input" id="noteInput" placeholder="Quick note…" autocomplete="off"/>
         <button class="goal-add-btn" id="noteAddBtn">+ Save</button>
@@ -1796,6 +1805,20 @@
     </div>
   </div>
   <input type="file" id="importFileInput" accept="application/json" hidden />
+
+  <div class="modal-overlay hidden" id="importChoiceModal">
+    <div class="modal-box">
+      <div class="modal-title">Restore dashboard data</div>
+      <div class="modal-field">
+        <div class="modal-label">Current data exists. Replace covered dashboard data or merge compatible collections?</div>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-cancel" id="importMergeBtn" type="button">Merge</button>
+        <button class="modal-save" id="importReplaceBtn" type="button">Replace</button>
+        <button class="modal-cancel" id="importCancelBtn" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Bookmark Modal -->
   <div class="modal-overlay hidden" id="bookmarkModal" onclick="closeBookmarkModalOnOverlay(event)">
@@ -1886,6 +1909,10 @@
       toast.textContent = msg;
       document.body.appendChild(toast);
       setTimeout(() => toast.remove(), 2200);
+    }
+
+    function escapeHTML(value) {
+      return String(value == null ? '' : value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
     }
 
     function qaGym() {
@@ -1995,36 +2022,8 @@
       });
     }
 
-    function collectDashboardBackup() {
-      const items = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (!key) continue;
-        if (
-          key.startsWith('goals:') ||
-          key.startsWith('hub_') ||
-          key.startsWith('nw:') ||
-          key.startsWith('po_') ||
-          key === 'goal_streak_v1' ||
-          key === 'subs' ||
-          key === 'subscriptions:v1' ||
-          key === 'subscriptions:v1:legacy-subs-copied' ||
-          key === 'incoming_orders' ||
-          key === 'wishlist' ||
-          key === 'finance_active_tab'
-        ) {
-          items[key] = localStorage.getItem(key);
-        }
-      }
-      return {
-        exportedAt: new Date().toISOString(),
-        source: 'personal-dashboard',
-        items,
-      };
-    }
-
     function exportDashboardData() {
-      const payload = collectDashboardBackup();
+      const payload = window.DashboardState ? window.DashboardState.collectBackup() : { schemaVersion: 1, source: 'personal-dashboard', exportedAt: new Date().toISOString(), data: {} };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -2035,24 +2034,51 @@
       showToast('Backup exported');
     }
 
+    let pendingImportPayload = null;
+
+    function refreshDashboardViews() {
+      updateStreak();
+      loadToday();
+      loadTomorrow();
+      renderPendingTasks();
+      renderStreak();
+      renderBookmarks();
+      renderNotes();
+      renderSnapshot();
+    }
+
+    function closeImportChoice() {
+      pendingImportPayload = null;
+      const modal = $('importChoiceModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function completeImport(mode) {
+      if (!pendingImportPayload || !window.DashboardState) return;
+      const result = window.DashboardState.applyBackup(pendingImportPayload, mode);
+      closeImportChoice();
+      if (!result.ok) {
+        showToast('Import failed');
+        return;
+      }
+      refreshDashboardViews();
+      showToast(mode === 'replace' ? 'Backup replaced' : 'Backup merged');
+    }
+
     function importDashboardData(file) {
       const reader = new FileReader();
       reader.onload = () => {
         try {
           const parsed = JSON.parse(reader.result);
-          const items = parsed && parsed.items;
-          if (!items || typeof items !== 'object') throw new Error('bad file');
-          Object.keys(items).forEach((key) => {
-            if (typeof items[key] === 'string') localStorage.setItem(key, items[key]);
-          });
-          updateStreak();
-          loadToday();
-          loadTomorrow();
-          renderStreak();
-          renderBookmarks();
-          renderNotes();
-          renderSnapshot();
-          showToast('Backup imported');
+          if (!window.DashboardState) throw new Error('dashboard helpers unavailable');
+          const validation = window.DashboardState.validateBackup(parsed);
+          if (!validation.ok) throw new Error(validation.error || 'bad file');
+          pendingImportPayload = validation.payload;
+          if (window.DashboardState.hasDashboardData()) {
+            $('importChoiceModal').classList.remove('hidden');
+          } else {
+            completeImport('replace');
+          }
         } catch (err) {
           showToast('Import failed');
         }
@@ -2184,24 +2210,7 @@
     }
 
     function runRollover() {
-      const activeDate = getActiveDateString();
-      const allGoalKeys = storeListKeys('goals:').sort();
-      for (const key of allGoalKeys) {
-        const dateStr = key.replace('goals:', '');
-        if (dateStr < activeDate) {
-          const oldGoals = storeGet(key) || [];
-          const todayKey = 'goals:' + activeDate;
-          const todayGoals = storeGet(todayKey) || [];
-          for (const g of oldGoals) {
-            if (!g.done) {
-              const exists = todayGoals.some(tg => tg.text === g.text);
-              if (!exists) todayGoals.push(g);
-            }
-          }
-          if (todayGoals.length > 0) storeSet(todayKey, todayGoals);
-          localStorage.removeItem(key);
-        }
-      }
+      renderPendingTasks();
     }
 
     function updateStreak() {
@@ -2284,6 +2293,31 @@
         });
         listEl.appendChild(more);
       }
+    }
+
+    function renderPendingTasks() {
+      const list = $('pendingTaskList');
+      const empty = $('pendingTaskEmpty');
+      if (!list || !empty || !window.DashboardState) return;
+      const pending = window.DashboardState.getOverdueTasks(getActiveDateString());
+      list.innerHTML = '';
+      empty.style.display = pending.length === 0 ? 'block' : 'none';
+      pending.forEach((item) => {
+        const li = document.createElement('li');
+        li.className = 'goal-item';
+        li.innerHTML = `
+          <div class="goal-checkbox" role="button" aria-label="Mark pending task complete"></div>
+          <span class="goal-text">${escapeHTML(item.text)} <small style="color:var(--text-tertiary)">${item.date}</small></span>
+        `;
+        li.querySelector('.goal-checkbox').addEventListener('click', () => {
+          window.DashboardState.resolveOverdueTask(item);
+          renderPendingTasks();
+          renderStreak();
+          renderSnapshot();
+          showToast('Pending task completed');
+        });
+        list.appendChild(li);
+      });
     }
 
     function buildGoalRow(goal, idx, key, readOnly) {
@@ -2539,10 +2573,42 @@
     }
 
     // ── Quick Notes ───────────────────────────────────────
+    let selectedNoteIndex = null;
+
+    function noteTitle(note) {
+      const text = (note && (note.title || note.text || note.content)) || '';
+      return String(text).trim().split('\n')[0].slice(0, 60) || 'Untitled note';
+    }
+
     function renderNotes() {
       const list = $('notesList');
+      const detail = $('noteDetail');
       const notes = storeGet('hub_notes') || [];
+      if (selectedNoteIndex != null && notes[selectedNoteIndex]) {
+        const note = notes[selectedNoteIndex];
+        list.style.display = 'none';
+        detail.style.display = 'block';
+        detail.innerHTML = `
+          <div class="note-item" style="display:block">
+            <button class="dash-nav-pill" id="noteBackBtn" type="button">← Back to notes</button>
+            <div style="margin-top:12px;font-weight:700">${escapeHTML(noteTitle(note))}</div>
+            <div class="note-text" style="white-space:pre-wrap;margin-top:8px">${escapeHTML(note.content || note.text || '')}</div>
+            <div class="note-time" style="margin-top:8px">${escapeHTML(note.createdAt || note.time || '')}</div>
+          </div>`;
+        $('noteBackBtn').addEventListener('click', () => {
+          selectedNoteIndex = null;
+          renderNotes();
+        });
+        return;
+      }
+      selectedNoteIndex = null;
+      list.style.display = '';
+      detail.style.display = 'none';
       list.innerHTML = '';
+      if (!Array.isArray(notes) || notes.length === 0) {
+        list.innerHTML = '<div class="empty-state">No notes yet.</div>';
+        return;
+      }
       const showCount = 5;
       const visible = notes.slice(0, showCount);
       for (let i = 0; i < visible.length; i++) {
@@ -2550,10 +2616,15 @@
         const item = document.createElement('div');
         item.className = 'note-item';
         item.innerHTML = `
-          <span class="note-text">${note.text}</span>
-          <span class="note-time">${note.time}</span>
+          <span class="note-text">${escapeHTML(noteTitle(note))}</span>
+          <span class="note-time">${escapeHTML(note.createdAt || note.time || '')}</span>
           <span class="note-del" onclick="deleteNote(${i})">×</span>
         `;
+        item.addEventListener('click', (event) => {
+          if (event.target.closest('.note-del')) return;
+          selectedNoteIndex = i;
+          renderNotes();
+        });
         list.appendChild(item);
       }
       if (notes.length > showCount) {
@@ -2565,9 +2636,15 @@
           list.innerHTML = '';
           const toShow = expanded ? visible : notes;
           for (const note of toShow) {
+            const idx = notes.indexOf(note);
             const item = document.createElement('div');
             item.className = 'note-item';
-            item.innerHTML = `<span class="note-text">${note.text}</span><span class="note-time">${note.time}</span><span class="note-del" onclick="deleteNote(${notes.indexOf(note)})">×</span>`;
+            item.innerHTML = `<span class="note-text">${escapeHTML(noteTitle(note))}</span><span class="note-time">${escapeHTML(note.createdAt || note.time || '')}</span><span class="note-del" onclick="deleteNote(${idx})">×</span>`;
+            item.addEventListener('click', (event) => {
+              if (event.target.closest('.note-del')) return;
+              selectedNoteIndex = idx;
+              renderNotes();
+            });
             list.appendChild(item);
           }
           more.textContent = expanded ? `Show ${notes.length - showCount} more ▾` : 'Show less ▴';
@@ -2589,6 +2666,7 @@
     runRollover();
     updateStreak();
     loadToday();
+    renderPendingTasks();
     loadTomorrow();
     renderStreak();
     updateDayRing();
@@ -2666,6 +2744,9 @@
     $('backupBtn').addEventListener('click', exportDashboardData);
     $('exportDataBtn').addEventListener('click', exportDashboardData);
     $('importDataBtn').addEventListener('click', () => $('importFileInput').click());
+    $('importMergeBtn').addEventListener('click', () => completeImport('merge'));
+    $('importReplaceBtn').addEventListener('click', () => completeImport('replace'));
+    $('importCancelBtn').addEventListener('click', closeImportChoice);
     $('importFileInput').addEventListener('change', (e) => {
       const file = e.target.files && e.target.files[0];
       if (file) importDashboardData(file);
@@ -2673,6 +2754,7 @@
     });
     window.addEventListener('storage', renderSnapshot);
     window.addEventListener('dashboard-data-changed', renderSnapshot);
+    window.addEventListener('goals-changed', renderPendingTasks);
     window.addEventListener('pageshow', renderSnapshot);
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) renderSnapshot();

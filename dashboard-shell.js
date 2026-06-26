@@ -3,6 +3,9 @@
 
   const WATER_KEY = 'po_water_v1';
   const SLEEP_KEY = 'po_sleep_v1';
+  const DASHBOARD_BACKUP_SCHEMA_VERSION = 1;
+  const FOCUS_SESSIONS_KEY = 'focus:sessions';
+  const NOTES_KEY = 'hub_notes';
 
   const DEFAULT_WATER_STATE = {
     unit: 'bottle',
@@ -52,6 +55,8 @@
     }
   }
 
+  function removeStorageKey(key) { storageCache.delete(key); localStorage.removeItem(key); notifyChange(key); }
+
   function notifyChange(key) {
     window.dispatchEvent(new CustomEvent('dashboard-data-changed', { detail: { key } }));
   }
@@ -72,6 +77,173 @@
 
   function localDateKey(date = new Date()) {
     return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+  }
+
+  function isGoalKey(key) { return /^goals:\d{4}-\d{2}-\d{2}$/.test(key); }
+
+  function isCoveredDashboardKey(key) {
+    return isGoalKey(key) || key === FOCUS_SESSIONS_KEY || key === NOTES_KEY ||
+      key.startsWith('hub_') || key.startsWith('nw:') || key.startsWith('po_') ||
+      key === 'goal_streak_v1' || key === 'subs' || key === 'subscriptions:v1' ||
+      key === 'subscriptions:v1:legacy-subs-copied' || key === 'incoming_orders' ||
+      key === 'wishlist' || key === 'finance_active_tab';
+  }
+
+  function listStorageKeys(prefix) {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (!prefix || key.startsWith(prefix))) keys.push(key);
+    }
+    return keys;
+  }
+
+  function parseStorageValue(raw) { if (raw == null) return null; try { return JSON.parse(raw); } catch (_) { return undefined; } }
+
+  function collectBackup() {
+    const data = {};
+    listStorageKeys().forEach((key) => {
+      if (!isCoveredDashboardKey(key)) return;
+      const parsed = parseStorageValue(localStorage.getItem(key));
+      if (parsed !== undefined) data[key] = parsed;
+    });
+    return {
+      schemaVersion: DASHBOARD_BACKUP_SCHEMA_VERSION,
+      exportedAt: new Date().toISOString(),
+      source: 'personal-dashboard',
+      data,
+    };
+  }
+
+  function normalizeBackupPayload(input) {
+    if (!input || typeof input !== 'object') return null;
+    if (input.schemaVersion === DASHBOARD_BACKUP_SCHEMA_VERSION && input.data && typeof input.data === 'object' && !Array.isArray(input.data)) {
+      return {
+        schemaVersion: input.schemaVersion,
+        exportedAt: input.exportedAt || new Date().toISOString(),
+        source: input.source || 'personal-dashboard',
+        data: Object.assign({}, input.data),
+      };
+    }
+    if (input.items && typeof input.items === 'object' && !Array.isArray(input.items)) {
+      const data = {};
+      Object.keys(input.items).forEach((key) => {
+        if (!isCoveredDashboardKey(key) || typeof input.items[key] !== 'string') return;
+        const parsed = parseStorageValue(input.items[key]);
+        if (parsed !== undefined) data[key] = parsed;
+      });
+      return {
+        schemaVersion: DASHBOARD_BACKUP_SCHEMA_VERSION,
+        exportedAt: input.exportedAt || new Date().toISOString(),
+        source: input.source || 'personal-dashboard',
+        data,
+      };
+    }
+    return null;
+  }
+
+  function isValidCoveredValue(key, value) {
+    if (key === FOCUS_SESSIONS_KEY || key === NOTES_KEY || isGoalKey(key)) return Array.isArray(value);
+    return true;
+  }
+
+  function validateBackup(input) {
+    const payload = normalizeBackupPayload(input);
+    if (!payload) return { ok: false, error: 'Unsupported backup format' };
+    if (payload.schemaVersion !== DASHBOARD_BACKUP_SCHEMA_VERSION) return { ok: false, error: 'Unsupported schema version' };
+    for (const key of Object.keys(payload.data)) {
+      if (!isCoveredDashboardKey(key)) return { ok: false, error: 'Unsupported key: ' + key };
+      if (!isValidCoveredValue(key, payload.data[key])) return { ok: false, error: 'Invalid value for ' + key };
+    }
+    return { ok: true, payload };
+  }
+
+  function noteIdentity(note) {
+    if (note && note.id != null) return 'id:' + note.id;
+    return note && (note.createdAt || note.title || note.content) ? 'stable:' + [note.createdAt || '', note.title || '', note.content || ''].join('|') : 'legacy:' + [(note && note.time) || '', (note && note.text) || ''].join('|');
+  }
+
+  function taskIdentity(task, date) { return task && task.id != null ? date + '|id:' + task.id : date + '|text:' + ((task && task.text) || ''); }
+
+  function focusSessionIdentity(session) { return [session && session.startedAt, session && session.plannedDuration, session && session.actualDuration, session && session.status].join('|'); }
+
+  function dedupeBy(items, identityFn) {
+    const seen = new Set();
+    const out = [];
+    (Array.isArray(items) ? items : []).forEach((item) => {
+      const identity = identityFn(item);
+      if (seen.has(identity)) return;
+      seen.add(identity);
+      out.push(item);
+    });
+    return out;
+  }
+
+  function mergeArrayForKey(key, current, imported) {
+    const combined = (Array.isArray(current) ? current : []).concat(Array.isArray(imported) ? imported : []);
+    if (key === NOTES_KEY) return dedupeBy(combined, noteIdentity);
+    if (key === FOCUS_SESSIONS_KEY) return dedupeBy(combined, focusSessionIdentity);
+    if (isGoalKey(key)) {
+      const date = key.replace('goals:', '');
+      return dedupeBy(combined, (task) => taskIdentity(task, date));
+    }
+    return combined;
+  }
+
+  function hasDashboardData() { return listStorageKeys().some(isCoveredDashboardKey); }
+
+  function applyBackup(payloadOrInput, mode) {
+    const result = validateBackup(payloadOrInput);
+    if (!result.ok) return result;
+    const payload = result.payload;
+    const restoreMode = mode === 'replace' ? 'replace' : 'merge';
+    if (restoreMode === 'replace') {
+      listStorageKeys().filter(isCoveredDashboardKey).forEach(removeStorageKey);
+      Object.keys(payload.data).forEach((key) => writeJSON(key, payload.data[key]));
+    } else {
+      Object.keys(payload.data).forEach((key) => {
+        const imported = payload.data[key];
+        const current = readJSON(key, null);
+        if (Array.isArray(imported)) writeJSON(key, mergeArrayForKey(key, current, imported));
+        else if (current == null) writeJSON(key, imported);
+      });
+    }
+    notifyChange('dashboard-import');
+    return { ok: true, mode: restoreMode, payload };
+  }
+
+  function getOverdueTasks(today = localDateKey(new Date())) {
+    const pending = [];
+    const seen = new Set();
+    listStorageKeys('goals:').sort().forEach((key) => {
+      const date = key.replace('goals:', '');
+      if (!isGoalKey(key) || date >= today) return;
+      const goals = readJSON(key, []);
+      if (!Array.isArray(goals)) return;
+      goals.forEach((goal, index) => {
+        if (!goal || goal.done) return;
+        const identity = taskIdentity(goal, date);
+        if (seen.has(identity)) return;
+        seen.add(identity);
+        pending.push({ key, date, index, id: goal.id, text: goal.text || '', goal });
+      });
+    });
+    return pending;
+  }
+
+  function resolveOverdueTask(taskRef) {
+    if (!taskRef || !isGoalKey(taskRef.key)) return false;
+    const goals = readJSON(taskRef.key, []);
+    if (!Array.isArray(goals)) return false;
+    const date = taskRef.key.replace('goals:', '');
+    let index = Number.isInteger(taskRef.index) ? taskRef.index : -1;
+    if (!goals[index] || taskIdentity(goals[index], date) !== taskIdentity(taskRef.goal || taskRef, date)) {
+      index = goals.findIndex((goal) => taskIdentity(goal, date) === taskIdentity(taskRef.goal || taskRef, date));
+    }
+    if (index < 0) return false;
+    goals[index] = Object.assign({}, goals[index], { done: true, doneAt: Date.now() });
+    writeJSON(taskRef.key, goals);
+    return true;
   }
 
   function activeDateKey(date = new Date()) {
@@ -412,11 +584,23 @@
   window.DashboardState = {
     WATER_KEY,
     SLEEP_KEY,
+    DASHBOARD_BACKUP_SCHEMA_VERSION,
+    FOCUS_SESSIONS_KEY,
+    NOTES_KEY,
     readJSON,
     writeJSON,
+    removeStorageKey,
     notifyChange,
     localDateKey,
     activeDateKey,
+    isCoveredDashboardKey,
+    collectBackup,
+    validateBackup,
+    applyBackup,
+    hasDashboardData,
+    mergeArrayForKey,
+    getOverdueTasks,
+    resolveOverdueTask,
     getWaterState,
     setWaterState,
     computeAutoWaterTargetMl,

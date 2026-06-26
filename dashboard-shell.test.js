@@ -22,6 +22,12 @@ function createLocalStorage() {
     clear() {
       data.clear();
     },
+    key(index) {
+      return Array.from(data.keys())[index] || null;
+    },
+    get length() {
+      return data.size;
+    },
   };
 }
 
@@ -130,6 +136,42 @@ function loadDashboardShell(pathname = '/index.html') {
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'dashboard-shell.js'), 'utf8'), context, { filename: 'dashboard-shell.js' });
   return { context, document, events, appended, containerAppended, mainContainer };
+}
+
+function loadFocusTimer() {
+  const listeners = {};
+  const document = {
+    readyState: 'loading',
+    head: { appendChild() {} },
+    body: { appendChild() {} },
+    createElement,
+    getElementById() { return null; },
+    addEventListener(type, handler) {
+      listeners[type] = listeners[type] || [];
+      listeners[type].push(handler);
+    },
+  };
+  const window = {
+    document,
+    addEventListener(type, handler) {
+      listeners[type] = listeners[type] || [];
+      listeners[type].push(handler);
+    },
+    dispatchEvent() {},
+  };
+  const context = {
+    window,
+    document,
+    localStorage: createLocalStorage(),
+    CustomEvent: class CustomEvent {},
+    setInterval() { return 1; },
+    clearInterval() {},
+    Date,
+    Math,
+  };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'focus-timer.js'), 'utf8'), context, { filename: 'focus-timer.js' });
+  return context.window.FocusTimerTest;
 }
 
 function readCachedAppShell() {
@@ -248,6 +290,60 @@ async function main() {
   // Dispatch storage event to invalidate
   document.dispatch('storage', { key: 'test_cache_key' });
   assert.ok(!state.storageCache.has('test_cache_key'), 'storage event invalidates cache');
+
+  // Versioned backup and import validation
+  context.localStorage.clear();
+  state.storageCache.clear();
+  state.writeJSON('hub_notes', [{ id: 'n1', title: 'Note', content: 'One', createdAt: '2026-01-01' }]);
+  state.writeJSON('focus:sessions', [{ startedAt: 1000, plannedDuration: 1500, actualDuration: 300, status: 'stopped-early' }]);
+  state.writeJSON('goals:2026-01-01', [{ id: 't1', text: 'Old task', done: false }]);
+  const backup = state.collectBackup();
+  assert.strictEqual(backup.schemaVersion, 1, 'backup exports a supported schema version');
+  assert.ok(Array.isArray(backup.data.hub_notes), 'backup stores parsed collection values');
+  const invalidSnapshot = context.localStorage.getItem('hub_notes');
+  const invalid = state.applyBackup({ schemaVersion: 99, data: { hub_notes: [] } }, 'replace');
+  assert.strictEqual(invalid.ok, false, 'unsupported import is rejected');
+  assert.strictEqual(context.localStorage.getItem('hub_notes'), invalidSnapshot, 'invalid import does not modify localStorage');
+
+  const legacy = { items: { hub_notes: JSON.stringify([{ id: 'n2', title: 'Legacy', content: 'Two', createdAt: '2026-01-02' }]) } };
+  assert.strictEqual(state.validateBackup(legacy).ok, true, 'legacy raw-string backup shape is accepted');
+
+  const mergePayload = {
+    schemaVersion: 1, source: 'personal-dashboard', exportedAt: '2026-01-03T00:00:00.000Z',
+    data: {
+      hub_notes: [{ id: 'n1', title: 'Note', content: 'One', createdAt: '2026-01-01' }, { id: 'n2', title: 'Note 2', content: 'Two', createdAt: '2026-01-02' }],
+      'focus:sessions': [{ startedAt: 1000, plannedDuration: 1500, actualDuration: 300, status: 'stopped-early' }, { startedAt: 2000, plannedDuration: 1500, actualDuration: 1500, status: 'completed' }],
+      'goals:2026-01-01': [{ id: 't1', text: 'Old task', done: false }, { id: 't2', text: 'Another task', done: false }],
+    },
+  };
+  assert.strictEqual(state.applyBackup(mergePayload, 'merge').ok, true, 'valid merge import succeeds');
+  assert.deepStrictEqual([state.readJSON('hub_notes', []).length, state.readJSON('focus:sessions', []).length, state.readJSON('goals:2026-01-01', []).length], [2, 2, 2], 'merge dedupes notes, focus sessions, and tasks');
+
+  const overdue = state.getOverdueTasks('2026-01-02');
+  assert.strictEqual(overdue.length, 2, 'overdue selectors derive incomplete older tasks from source date keys');
+  assert.strictEqual(state.resolveOverdueTask(overdue[0]), true, 'resolving pending task updates source goal key');
+  assert.strictEqual(state.readJSON('goals:2026-01-01', [])[0].done, true, 'source dated task is marked complete');
+
+  const indexSource = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const rolloverBody = indexSource.match(/function runRollover\(\) \{([\s\S]*?)\n    \}/)[1];
+  assert.ok(!/removeItem|storeDelete|storeSet\('goals:/.test(rolloverBody), 'runRollover no longer moves or deletes overdue goals');
+
+  const timer = loadFocusTimer();
+  const started = timer.startState(timer.createIdleState(1500), 1500, 1000);
+  assert.strictEqual(started.phase, timer.ACTIVE, 'timer starts active');
+  const ticked = timer.tickState(started, 11000); assert.strictEqual(ticked.remainingSeconds, 1490, 'active tick reduces remaining time');
+  const paused = timer.pauseState(ticked, 21000);
+  assert.strictEqual(paused.phase, timer.PAUSED, 'pause transitions to paused');
+  assert.strictEqual(timer.tickState(paused, 31000).remainingSeconds, paused.remainingSeconds, 'paused timer does not keep ticking');
+  const resumed = timer.resumeState(paused, 31000);
+  assert.strictEqual(timer.tickState(resumed, 41000).remainingSeconds, paused.remainingSeconds - 10, 'resume continues from paused remaining time');
+  const reset = timer.resetState(resumed);
+  assert.strictEqual(reset.remainingSeconds, 1500, 'reset returns to planned duration');
+  const stopped = timer.finishState(paused, 'stopped-early', 42000);
+  assert.strictEqual(stopped.record.status, 'stopped-early', 'early stop logs stopped-early');
+  assert.ok(stopped.record.actualDuration > 0, 'early stop logs focused elapsed seconds');
+  const completed = timer.finishState(Object.assign({}, started, { remainingSeconds: 0, focusedElapsedSeconds: 1500 }), 'completed', 51000);
+  assert.strictEqual(completed.record.actualDuration, 1500, 'completion logs planned duration');
 
   console.log('dashboard-shell regression tests passed');
 }
