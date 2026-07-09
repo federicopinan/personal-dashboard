@@ -383,9 +383,13 @@
         to   { opacity: 0; transform: translateY(18px); }
       }
 
-      /* ── Dock / Tabbar (fixed top) ───────────────────────── */
+      /* ── Dock / Tabbar (fixed top) ─────────────────────────
+         Tabbar height = .tabbar padding (10+10) + .tabbar-inner padding (5+5)
+         + .tab content (9 + 22 icon + 3 gap + 11 label + 9) + 2px line-height
+         overflow = 88px when env(safe-area-inset-top)=0.
+         Body padding must match or content is hidden behind the dock. */
       body.pd-has-dock {
-        padding-top: calc(68px + env(safe-area-inset-top, 0px));
+        padding-top: calc(88px + env(safe-area-inset-top, 0px));
       }
       .tabbar {
         position: fixed;
