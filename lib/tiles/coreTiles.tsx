@@ -25,7 +25,6 @@ export type CoreTileId =
   | 'fuel'
   | 'vitals'
   | 'peak'
-  | 'brand'
   | 'finance'
 
 /** A single live metric to surface on a tile (Train day, Fuel kcal). */
@@ -143,33 +142,10 @@ export const CORE_TILES: Record<CoreTileId, CoreTile> = {
       </svg>
     ),
   },
-  brand: {
-    id: 'brand',
-    href: '/app/starter',
-    index: '05',
-    label: 'Brand',
-    orb: { mode: 'still', roam: 'spoke', pt: '105,112' },
-    defaultSize: 'tall',
-    glyph: (
-      <svg viewBox="-12 -12 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round">
-        <path d="M-8 -5 L0 9 L8 -5" />
-      </svg>
-    ),
-    art: (
-      <svg className="art" viewBox="0 0 210 250">
-        <g style={{ opacity: 0.65 }}>
-          <line className="motd" x1="105" y1="112" x2="105" y2="68" /><line className="motd" x1="105" y1="112" x2="145" y2="90" />
-          <line className="motd" x1="105" y1="112" x2="145" y2="134" /><line className="motd" x1="105" y1="112" x2="65" y2="134" />
-          <line className="motd" x1="105" y1="112" x2="65" y2="90" />
-        </g>
-        <g className="orb"><circle className="glow" r="10" /><circle className="node" r="3.4" /></g>
-      </svg>
-    ),
-  },
   finance: {
     id: 'finance',
     href: '/app/starter',
-    index: '07',
+    index: '05',
     label: 'Finance',
     variant: 'fin',
     orb: { mode: 'hop' },
@@ -258,7 +234,6 @@ export const DEFAULT_HOME_ORDER: HomeTileId[] = [
   'library',
   'vitals',
   'vee',
-  'brand',
   'peak',
   'finance',
 ]

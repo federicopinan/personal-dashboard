@@ -26,8 +26,10 @@ export interface Profile {
   units?: 'metric' | 'imperial'
 }
 
-/** Blank until the mentor asks. Fallbacks live at the call sites. */
-export const DEFAULT_PROFILE: Profile = {}
+/** Metric defaults — ask in their units, store metric. lib knows only cm/kg. */
+export const DEFAULT_PROFILE: Profile = {
+  units: 'metric',
+}
 
 /** The profile: localStorage override ('vitality:profile') if valid, else defaults. */
 export function profile(): Profile {

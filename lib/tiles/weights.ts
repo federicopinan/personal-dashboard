@@ -49,20 +49,25 @@ export interface Notice {
 
 export const DEFAULT_GOALS: Goal[] = [
   {
-    id: 'youtube',
-    title: 'Become a famous YouTuber',
-    accent: '#6EE7B7',
-    // Train entered this goal when the mentor noticed workouts drive output —
-    // see DEFAULT_NOTICED. Before: brand 70 / vitals 20 / finance 10.
-    weights: { brand: 62, train: 8, vitals: 20, finance: 10 },
-    progress: 28,
+    id: 'soc-analyst',
+    title: 'SOC Blue Team analyst',
+    accent: '#00D4FF',
+    weights: { train: 5, fuel: 5, vitals: 25, peak: 5, finance: 60 },
+    progress: 5,
   },
   {
-    id: 'lean185',
-    title: 'Be 185 lb lean',
-    accent: '#8AB4FF',
-    weights: { train: 40, fuel: 30, vitals: 20, peak: 10 },
-    progress: 61,
+    id: 'jacked',
+    title: 'Get jacked',
+    accent: '#FF6B6B',
+    weights: { train: 50, fuel: 30, vitals: 15, peak: 5 },
+    progress: 10,
+  },
+  {
+    id: 'trader',
+    title: 'Professional trader',
+    accent: '#FFD700',
+    weights: { train: 5, fuel: 5, vitals: 10, peak: 5, finance: 75 },
+    progress: 5,
   },
 ]
 
@@ -70,10 +75,10 @@ export const DEFAULT_GOALS: Goal[] = [
  *  mentor (Claude Code). Switching it on = top priority — the board goes gold. */
 export const OVERALL_GOAL: Goal = {
   id: 'overall',
-  title: 'A jacked, famous YouTuber',
-  accent: '#E8C878',
-  weights: { brand: 30, train: 25, vitals: 20, fuel: 13, finance: 7, peak: 5 },
-  progress: 34,
+  title: "A SOC analyst who's jacked and trades",
+  accent: '#00D4FF',
+  weights: { train: 20, fuel: 10, vitals: 20, peak: 5, finance: 45 },
+  progress: 5,
 }
 
 /** Overall first, then the individual goals. */
@@ -89,19 +94,15 @@ export function activeGoal(): Goal | undefined {
 
 export const DEFAULT_NOTICED: Notice[] = [
   {
-    id: 'n-workouts-drive',
-    when: 'this morning',
-    text: 'When you skip the gym, you drink less water — and your analytics take a deep dive the same day. Workouts might be the key to your drive, not just your body. I moved Train into the YouTuber goal.',
+    id: 'n-fresh-start',
+    when: 'today',
+    text: 'Fresh start — new goals, clean board. SOC analyst, jacked, trader. We\'ll tune the weights as data rolls in.',
     points: [
-      'When you skip the gym, you drink **less water** the same day',
-      'No-workout days: your **analytics take a deep dive**',
-      '**Workouts might be the key to your drive** — not just your body',
-      'So I moved **Train into the YouTuber goal**',
+      'New goals: **SOC analyst**, **jacked**, **trader**',
+      '**Brand is gone** — all the weight shifted to what moves the needle',
+      'Let\'s get to work',
     ],
-    deltas: [
-      { tile: 'train', from: 0, to: 8 },
-      { tile: 'brand', from: 70, to: 62 },
-    ],
+    deltas: [],
   },
 ]
 
@@ -123,50 +124,66 @@ export interface TileIdea {
 export const DEFAULT_IDEAS: Record<string, TileIdea[]> = {
   overall: [
     {
-      word: 'Pipeline',
-      title: 'Content pipeline',
-      tracks: 'videos in flight → published, per week',
-      why: 'Your output IS the goal — but nothing tracks the machine that makes it. Brand tracks the channel; this tracks the work.',
-      estWeight: 10,
-    },
-    {
       word: 'Sleep',
       title: 'Sleep consistency',
       tracks: 'bedtime variance, night by night',
-      why: 'Your recovery swings track your analytics dips. Vitals sees the score — this would see the habit behind it.',
+      why: 'Recovery is everything when you\'re grinding SOC by day, trading by night, and chasing gains.',
+      estWeight: 8,
+    },
+    {
+      word: 'Screen',
+      title: 'Screen time',
+      tracks: 'hours staring at screens vs sleep',
+      why: 'SOC + trading = you LIVE on screens. Tracking it keeps the burnout away.',
       estWeight: 6,
     },
   ],
-  youtube: [
+  'soc-analyst': [
     {
-      word: 'Pipeline',
-      title: 'Content pipeline',
-      tracks: 'ideas → filmed → edited → published',
-      why: 'You track the channel (Brand) but not the machine that feeds it. Publishing cadence is the single biggest lever here.',
-      estWeight: 12,
+      word: 'Labs',
+      title: 'Home lab hours',
+      tracks: 'hours spent on labs, certs, hack-the-box',
+      why: 'Blue Team is a craft. Lab time is the single biggest lever outside the SOC.',
+      estWeight: 25,
     },
     {
-      word: 'Caffeine',
-      title: 'Caffeine timing',
-      tracks: 'when + how much, against publish days',
-      why: 'The data hints more caffeine on publish days — fuel or crutch? One small tile answers it.',
-      estWeight: 5,
+      word: 'Study',
+      title: 'Study streak',
+      tracks: 'daily cybersecurity study streak',
+      why: 'Certs, tools, log analysis — every day compounds.',
+      estWeight: 20,
     },
   ],
-  lean185: [
+  jacked: [
     {
       word: 'Water',
       title: 'Water',
       tracks: 'daily intake vs target',
-      why: 'The noticed pattern: skip the gym → drink less. No tile tracks water yet — it is the cheapest input you are missing.',
+      why: 'The gym alone won\'t get you jacked. Water is the cheapest compound lift you\'re not tracking.',
       estWeight: 8,
     },
     {
       word: 'Steps',
       title: 'Steps / NEAT',
       tracks: 'daily movement outside the gym',
-      why: 'At 185-lean, the deficit is won between workouts. Train sees sessions; nothing sees the other 23 hours.',
+      why: 'Gains happen at the table and between sessions. Train sees workouts; nothing sees the other 23 hours.',
       estWeight: 7,
+    },
+  ],
+  trader: [
+    {
+      word: 'Journal',
+      title: 'Trade journal',
+      tracks: 'trades + emotions + lessons',
+      why: 'Your edge is in the data. A journal turns every trade into a lesson.',
+      estWeight: 15,
+    },
+    {
+      word: 'Study',
+      title: 'Market study',
+      tracks: 'hours studying charts, news, strategies',
+      why: 'Professional trading is a skill. Daily study sharpens the edge.',
+      estWeight: 10,
     },
   ],
 }
