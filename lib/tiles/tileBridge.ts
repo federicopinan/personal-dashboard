@@ -20,12 +20,8 @@ const SHIM = `<script>
     if (m.type === 'load:result') p.resolve(m.data);
     else if (m.type === 'save:ok') p.resolve(true);
     else if (m.type === 'save:error') p.reject(new Error(m.reason || 'save_failed'));
-    else if (m.type === 'tiktok:result') p.resolve(m.count);
-    else if (m.type === 'tiktok:error') p.reject(new Error(m.reason || 'tiktok_failed'));
     else if (m.type === 'read:result') p.resolve(m.data);
     else if (m.type === 'read:error') p.reject(new Error(m.reason || 'read_failed'));
-    else if (m.type === 'youtube:result') p.resolve(m.count);
-    else if (m.type === 'youtube:error') p.reject(new Error(m.reason || 'youtube_failed'));
     else if (m.type === 'stock:result') p.resolve(m.price);
     else if (m.type === 'stock:error') p.reject(new Error(m.reason || 'stock_failed'));
   });
@@ -49,8 +45,6 @@ const SHIM = `<script>
   window.Vitality = {
     save: function (data) { return call('save', { data: data }); },
     load: function () { return call('load', {}); },
-    tiktok: function (handle) { return call('tiktok', { handle: handle }); },
-    youtube: function (handle) { return call('youtube', { handle: handle }); },
     stock: function (symbol) { return call('stock', { symbol: symbol }); },
     read: function (slot) { return call('read', { slot: slot }); },
     report: function (stream) {

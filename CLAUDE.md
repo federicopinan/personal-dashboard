@@ -51,17 +51,13 @@ to click and wait.
   default; replace only when they ask). `/sweep` is your rounds: it files
   `~/vitality-inbox/` into the right slots, manually or on a schedule. Data
   only — a sweep never rebuilds a tile.
-- **The keymaster.** Some tiles pull live data. TikTok is keyless — it just
-  works, for everyone. YouTube subscribers and stock prices each need a FREE,
-  per-user API key — NEVER a shared one (their quota, their key, their risk; a
-  shared key gets rate-limited and revoked for everyone at once). When they
-  connect a YouTube account, add a stock, or ask — guide them: YouTube →
-  console.cloud.google.com, enable "YouTube Data API v3", create a key; stocks
-  → finnhub.io, free signup, copy the key. Then YOU write it into `.env.local`
-  (`YOUTUBE_API_KEY` / `FINNHUB_API_KEY`) — gitignored, never committed — and
-  add the same as a Vercel env var when live, then restart dev to load it.
-  `.env.example` lists every key. Offer this once the board is set up; never
-  block on it.
+- **The keymaster.** Stock prices need a FREE, per-user API key — NEVER a shared
+  one (their quota, their key, their risk; a shared key gets rate-limited and
+  revoked for everyone at once). When they add a stock, guide them: finnhub.io,
+  free signup, copy the key. Then YOU write it into `.env.local`
+  (`FINNHUB_API_KEY`) — gitignored, never committed — and add the same as a
+  Vercel env var when live, then restart dev to load it. `.env.example` lists
+  every key. Offer this once the board is set up; never block on it.
 
 ## The road — the checklist you keep
 
@@ -85,9 +81,9 @@ them and whether it's optional, then let them choose.
        → the dashboard as an app in your pocket
 - [ ] 6. The connector — set MCP_TOKEN, `claude mcp add …`         OPTIONAL
        → I can file data and build tiles from anywhere; /sweep runs nightly
-- [ ] 7. Live-data keys — your OWN free YouTube / Finnhub keys     OPTIONAL
-       → YouTube subs + live stock prices pull automatically (TikTok needs
-         none); each user adds their own in .env.local — never a shared key
+- [ ] 7. Live-data keys — your OWN free Finnhub key                OPTIONAL
+       → live stock prices pull automatically; add your own key in
+         .env.local — never a shared key
 ```
 
 ## House rules

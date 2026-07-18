@@ -868,7 +868,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
             </button>
           </div>
 
-          <div
+          <div className="xRow"
             style={{
               display: 'flex',
               gap: 16,

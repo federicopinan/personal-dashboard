@@ -89,3 +89,4 @@ supabase/.temp/
 public/*-preview.html
 /explain-*.png
 /pol-*.png
+.atl/

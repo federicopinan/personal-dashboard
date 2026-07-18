@@ -38,11 +38,9 @@ Tiles are sealed sandboxed iframes; they CANNOT fetch. They talk to the dashboar
 ONLY through `window.Vitality`:
 - `save(data)` / `load()` — persist + read this tile's own data
 - `read(slot)` — read another tile's data (e.g. Peak reads Vitals)
-- `tiktok(handle)` — live follower count, **keyless** (works for everyone)
-- `youtube(handle)` — subscriber count (needs the user's free `YOUTUBE_API_KEY`, server-routed)
 - `stock(symbol)` — latest price (needs the user's free `FINNHUB_API_KEY`, server-routed)
 
-Slots: `train fuel vitals brand peak finance` (+ `vee`). Aesthetic: **vanilla CSS
+Slots: `train fuel vitals peak finance` (+ `vee`). Aesthetic: **vanilla CSS
 only**, near-black bg, mint `#6EE7B7` / gold accents, serif = Georgia italic.
 
 ## The one rule

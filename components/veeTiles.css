@@ -393,3 +393,32 @@
   pointer-events: none;
   z-index: 6;
 }
+
+/* ── x-row tile row: wraps vertically on phone ──
+   On desktop the x tiles scroll horizontally; on phone they stack in a single
+   column so every tile fills the screen width with no side-scroll. */
+@media (max-width: 760px) {
+  .veeTiles .xRow {
+    flex-direction: column;
+    overflow-x: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    -webkit-mask: none !important;
+    mask: none !important;
+  }
+  .veeTiles .xRow > * {
+    width: 100% !important;
+  }
+  .veeTiles .xRow > * > * {
+    width: 100% !important;
+  }
+  .veeTiles .xRow .tile {
+    width: 100% !important;
+  }
+  .veeTiles .xRow .tile ~ span {
+    display: none;
+  }
+  .veeTiles .xRow > button {
+    width: 100% !important;
+  }
+}

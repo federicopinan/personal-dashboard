@@ -65,55 +65,6 @@ export function useTileHost(
       const src = e.source as Window | null
       if (!src) return
 
-      // TikTok follower lookup — the host fetches on the sealed tile's behalf,
-      // since tiles can't reach the network themselves. Keyless + public
-      // (tikwm), returns only a follower COUNT, touches no user storage, so it
-      // needs no tileId and runs before the registry gate. This is the demo's
-      // zero-setup live-data door — no MCP connector, no /sweep required.
-      if (msg.type === 'tiktok') {
-        const handle = String(msg.handle || '').replace(/^@+/, '').trim()
-        if (!handle) {
-          src.postMessage({ source: 'vitality-host', type: 'tiktok:error', id: msg.id, reason: 'no_handle' }, '*')
-          return
-        }
-        try {
-          const r = await fetch('https://www.tikwm.com/api/user/info?unique_id=' + encodeURIComponent(handle))
-          const j = await r.json()
-          const count = j?.data?.stats?.followerCount
-          if (typeof count === 'number' && count >= 0) {
-            src.postMessage({ source: 'vitality-host', type: 'tiktok:result', id: msg.id, count }, '*')
-          } else {
-            src.postMessage({ source: 'vitality-host', type: 'tiktok:error', id: msg.id, reason: String(j?.msg || 'no_data') }, '*')
-          }
-        } catch {
-          src.postMessage({ source: 'vitality-host', type: 'tiktok:error', id: msg.id, reason: 'fetch_failed' }, '*')
-        }
-        return
-      }
-
-      // YouTube subscribers — routed through /api/youtube/subs so the API key
-      // stays server-side (YouTube is keyed, unlike TikTok). no_key → the tile
-      // tells the user to add a free key.
-      if (msg.type === 'youtube') {
-        const handle = String(msg.handle || '').replace(/^@+/, '').trim()
-        if (!handle) {
-          src.postMessage({ source: 'vitality-host', type: 'youtube:error', id: msg.id, reason: 'no_handle' }, '*')
-          return
-        }
-        try {
-          const r = await fetch('/api/youtube/subs?handle=' + encodeURIComponent(handle))
-          const j = await r.json()
-          if (typeof j?.count === 'number') {
-            src.postMessage({ source: 'vitality-host', type: 'youtube:result', id: msg.id, count: j.count }, '*')
-          } else {
-            src.postMessage({ source: 'vitality-host', type: 'youtube:error', id: msg.id, reason: String(j?.error || 'no_data') }, '*')
-          }
-        } catch {
-          src.postMessage({ source: 'vitality-host', type: 'youtube:error', id: msg.id, reason: 'fetch_failed' }, '*')
-        }
-        return
-      }
-
       // Stock price — routed through /api/finance/quote so the Finnhub key stays
       // server-side. Returns the latest price for one symbol.
       if (msg.type === 'stock') {

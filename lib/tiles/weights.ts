@@ -4,8 +4,8 @@
  *   y = the Mentor (the overseer, where the math lives)
  *   x = each input tile · w = that tile's share of the ACTIVE goal
  *
- * Each goal carries its own weights (sum ≈ 100): "famous YouTuber" leans on
- * Brand; "185 lb lean" leans on Train/Fuel. The row badges show the active
+ * Each goal carries its own weights (sum ≈ 100): "SOC analyst" leans on
+ * finance/vitals; "jacked" leans on Train/Fuel. The row badges show the active
  * goal's weights; the Mentor lists every goal with its full breakdown.
  *
  * WHO DOES THE MATH: Claude Code, at build time — not an Anthropic key, not

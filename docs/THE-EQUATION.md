@@ -43,7 +43,7 @@ Sealed tiles can't fetch (sandboxed, no network). So ALL automation flows one la
 | **Scheduled sweeps + API keys** | claude.ai scheduled task holds the key (Finnhub, YouTube), fetches, pushes into the tile's data via the connector | **GAP: connector has NO `save_data`/`read_data` tools — build these next** |
 
 Canonical episode demo: *finances → Finnhub key → scheduled Claude task → stocks tile
-updates itself every morning.* Same recipe: YouTube API → brand tile. One recipe,
+updates itself every morning.* Same recipe: live API → brand tile. One recipe,
 infinite tiles.
 
 ## The Mentor (y) — next build

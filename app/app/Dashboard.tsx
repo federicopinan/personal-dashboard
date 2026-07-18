@@ -97,7 +97,7 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
             </p>
             <ul style={{ margin: 0, padding: 0, listStyle: 'none', color: 'var(--muted)', fontSize: 13, lineHeight: 2 }}>
               <li><strong style={{ color: 'var(--fg)' }}>manual</strong> — type it straight into a tile</li>
-              <li><strong style={{ color: 'var(--fg)' }}>api keys</strong> — I fetch (stocks, YouTube) and file it in</li>
+              <li><strong style={{ color: 'var(--fg)' }}>api keys</strong> — I fetch (stocks) and file it in</li>
               <li><strong style={{ color: 'var(--fg)' }}>mcp connector</strong> — your own token; I write in from anywhere</li>
               <li><strong style={{ color: 'var(--fg)' }}>scheduled sweeps</strong> — I run on a schedule, noticing while you sleep</li>
             </ul>

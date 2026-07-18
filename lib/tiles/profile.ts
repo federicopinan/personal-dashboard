@@ -28,6 +28,11 @@ export interface Profile {
 
 /** Metric defaults — ask in their units, store metric. lib knows only cm/kg. */
 export const DEFAULT_PROFILE: Profile = {
+  name: 'Federico',
+  heightCm: 183,
+  weightKg: 72,
+  age: 22,
+  sex: 'male',
   units: 'metric',
 }
 
