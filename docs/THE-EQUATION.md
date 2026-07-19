@@ -43,8 +43,7 @@ Sealed tiles can't fetch (sandboxed, no network). So ALL automation flows one la
 | **Scheduled sweeps + API keys** | claude.ai scheduled task holds the key (Finnhub, YouTube), fetches, pushes into the tile's data via the connector | **GAP: connector has NO `save_data`/`read_data` tools — build these next** |
 
 Canonical episode demo: *finances → Finnhub key → scheduled Claude task → stocks tile
-updates itself every morning.* Same recipe: live API → brand tile. One recipe,
-infinite tiles.
+updates itself every morning.* Same recipe, infinite tiles.
 
 ## The Mentor (y) — next build
 
@@ -68,7 +67,6 @@ infinite tiles.
 - **Each episode = one new input tile + one data-in method** (manual → MCP → API key →
   scheduled sweep). That's the content engine and the income.
 - Patreon: https://www.patreon.com/cw/RowanTBK/shop · prod: https://vitality-jade.vercel.app
-  (Design Lab live URL: Luke to supply — wire `DESIGN_LAB_URL` in DashboardGrid to it.)
 
 ## Next steps (in order)
 
@@ -77,6 +75,4 @@ infinite tiles.
    → unlocks scheduled sweeps end-to-end.
 2. **Mentor goal UI + deterministic Peak score** (goal, weights editor, Σ w·x, per-tile %).
 3. **Prove one sweep on camera:** Finnhub → finance tile, scheduled task, no key in the app.
-4. Design Lab site: all-commands gallery, some free / most blurred (Patreon), plus the
-   paid customize button. Swap `DESIGN_LAB_URL` to the real lab URL.
-5. Dynamic slots (beyond the fixed 7) so every future episode adds a brand-new tile.
+4. Dynamic slots (beyond the fixed 6) so every future episode adds a brand-new tile.

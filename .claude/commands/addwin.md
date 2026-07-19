@@ -1,14 +1,14 @@
 ---
-description: Add the rest timer to your app in one paste. Real tested code. Builds on the logger.
+description: Add the win pulse to your app in one paste. Real tested code. Builds on the logger.
 ---
 
-You are adding the rest timer: the ring that counts your rest between sets and arms the next set.
+You are adding the win pulse: the celebration beat: a ripple, a spark burst, and a number that lands with a spring; drop it on any moment worth feeling.
 
-STEP 0, THE FILES: the tested code ships at code/the-living-logger.html next to this command. If that file is NOT in this project, fetch the arsenal first, then continue:
+STEP 0, THE FILES: the tested code ships at code/the-radar.html next to this command. If that file is NOT in this project, fetch the arsenal first, then continue:
 curl -sL https://vitality-jade.vercel.app/lab/the-arsenal.zip -o /tmp/arsenal.zip && unzip -o /tmp/arsenal.zip -d .
 
 THE JOB (make it drop cleanly into ANY app, self-contained):
-1. Open code/the-living-logger.html and take the region between <!-- @episode-start:rest-timer --> and <!-- @episode-end:rest-timer -->.
+1. Open code/the-radar.html and take the region between <!-- @episode-start:win --> and <!-- @episode-end:win -->.
 2. Bring EVERYTHING that region needs to work on its own: the HTML, every CSS rule it uses (search the file's <style> for each class name in the region), AND every JS function it calls (search the <script>; follow helper calls one level deep so nothing is left undefined). If unsure, grab more, not less.
 3. RE-SKIN it to THIS app, do not paste copper-on-black into a light app. Map the colors and the two or three fonts to the target's existing design tokens (CSS variables, Tailwind theme, whatever they use). Keep the shape and the motion, change only the palette and type so it looks native here.
 4. Wire it into one screen and make it self-contained: no reference to the-radar's other regions, no dead variables. It must run even if this is the only piece installed.

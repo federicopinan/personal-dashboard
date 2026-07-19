@@ -15,7 +15,7 @@ Every tile reports one normalized input score for the day, x ∈ 0–100:
 | train   | sessions_this_week / weekly_target × 100 (cap 100)|
 | vitals  | the recovery estimate (already 0–100)             |
 | peak    | today's average predicted score                   |
-| brand   | this week's growth / target pace × 100 (cap 100)  |
+
 | finance | on-plan ratio vs monthly target (cap 100)         |
 
 Each tile carries a weight w toward the ACTIVE goal (weights sum to 100,

@@ -349,11 +349,6 @@ function ConnectorOverlay({ id, label, onClose }: { id: string; label: string; o
   )
 }
 
-/** The Lab — every episode's /command lives here. */
-// The demo Lab ships INSIDE the dashboard (public/demo) — so this link always
-// works on every fork, at their own URL, with no external site to deploy.
-const DESIGN_LAB_URL = '/demo/index.html'
-
 /* ── the "+ New tile" panel: dead simple — start with /tile ── */
 function NewTileOverlay({ onClose }: { onClose: () => void; onSaved?: (slot: string, html: string) => void }) {
   return (
@@ -382,41 +377,9 @@ function NewTileOverlay({ onClose }: { onClose: () => void; onSaved?: (slot: str
           </p>
           <p style={{ margin: '12px auto 0', maxWidth: 380, textAlign: 'center', color: 'var(--muted)', fontSize: 13.5, lineHeight: 1.65 }}>
             In Claude Code, run <code style={{ color: 'var(--mint)' }}>/tile train</code> (or any slot:
-            fuel, vitals, brand, peak, finance). It builds the tile and drops it straight onto your board.
+            fuel, vitals, peak, finance). It builds the tile and drops it straight onto your board.
           </p>
-          <div
-            style={{
-              border: '1px solid var(--border)',
-              borderRadius: 12,
-              padding: '13px 16px',
-              margin: '24px 0 0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12,
-            }}
-          >
-            <p style={{ margin: 0, color: 'var(--muted)', fontSize: 12.5, lineHeight: 1.5 }}>
-              Need inspiration? Browse the <strong style={{ color: 'var(--fg)' }}>Design Lab</strong> for new tile ideas.
-            </p>
-            <a
-              href={DESIGN_LAB_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                flex: '0 0 auto',
-                background: 'var(--mint)',
-                color: 'var(--mint-ink, #042a1c)',
-                borderRadius: 999,
-                padding: '8px 14px',
-                fontWeight: 600,
-                fontSize: 12.5,
-                textDecoration: 'none',
-              }}
-            >
-              Design Lab →
-            </a>
-          </div>
+
         </div>
       </div>
     </div>

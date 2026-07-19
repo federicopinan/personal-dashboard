@@ -394,6 +394,29 @@
   z-index: 6;
 }
 
+/* ── x-row horizontal scrollbar ──
+   Slim, dark, mint-accented scrollbar that fits the glass-mint theme. */
+.veeTiles .xRow::-webkit-scrollbar {
+  height: 5px;
+}
+.veeTiles .xRow::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+}
+.veeTiles .xRow::-webkit-scrollbar-thumb {
+  background: rgba(110, 231, 183, 0.25);
+  border-radius: 4px;
+}
+.veeTiles .xRow::-webkit-scrollbar-thumb:hover {
+  background: rgba(110, 231, 183, 0.4);
+}
+@supports (scrollbar-color: auto) {
+  .veeTiles .xRow {
+    scrollbar-color: rgba(110, 231, 183, 0.25) rgba(255, 255, 255, 0.04);
+    scrollbar-width: thin;
+  }
+}
+
 /* ── x-row tile row: wraps vertically on phone ──
    On desktop the x tiles scroll horizontally; on phone they stack in a single
    column so every tile fills the screen width with no side-scroll. */

@@ -18,7 +18,7 @@ shows the "how to build this" panel instead.
 | `fuel`   | Fuel     | `public/tiles/fuel.html`   |
 | `vitals` | Vitals   | `public/tiles/vitals.html` |
 | `vee`    | Vee      | `public/tiles/vee.html`    |
-| `brand`  | Brand    | (removed from CORE)        |
+
 | `peak`   | Peak     | `public/tiles/peak.html`   |
 | `finance`| Finance  | `public/tiles/finance.html`|
 
