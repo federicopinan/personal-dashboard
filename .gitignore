@@ -90,3 +90,11 @@ public/*-preview.html
 /explain-*.png
 /pol-*.png
 .atl/
+
+# playwright test outputs (local run artifacts, never committed)
+/test-results/
+.maint-*.png
+
+# local tool config (pi, atl — never committed)
+.pi/
+
