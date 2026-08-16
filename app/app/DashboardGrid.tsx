@@ -298,13 +298,12 @@ function ConnectorOverlay({ id, label, onClose }: { id: string; label: string; o
 
           <ol style={{ color: 'var(--muted)', lineHeight: 1.7, paddingLeft: 18 }}>
             <li>
-              <strong style={{ color: 'var(--fg)' }}>From a video episode:</strong> drop the
-              episode's command into <code>.claude/commands/</code> and run it in Claude Code.
-              It writes this exact file.
+              <strong style={{ color: 'var(--fg)' }}>From library:</strong> copy the tile template from
+              <code style={{ color: 'var(--mint)' }}> tiles-library/{id}.html</code> to <code style={{ color: 'var(--mint)' }}>{path}</code>.
             </li>
             <li style={{ marginTop: 8 }}>
-              <strong style={{ color: 'var(--fg)' }}>Build your own:</strong> run
-              <code style={{ color: 'var(--mint)' }}> /tile {id}</code>, or paste this into Claude Code:
+              <strong style={{ color: 'var(--fg)' }}>Custom tile:</strong> run
+              <code style={{ color: 'var(--mint)' }}> /tile {id}</code> or paste this prompt:
             </li>
           </ol>
 

@@ -8,7 +8,8 @@ import DashboardHeaderGem from './DashboardHeaderGem'
 import DashboardGrid from './DashboardGrid'
 import '@/components/veeTiles.css'
 import { dashboardChrome, backgroundAccent, DEFAULT_CHROME, type DashboardChrome } from '@/lib/tiles/dashboardChrome'
-import { activeGoal } from '@/lib/tiles/weights'
+import { activeGoal, goals, saveGoals, activeGoalId, setActiveGoalId, type Goal } from '@/lib/tiles/weights'
+import { profile, saveProfile, type Profile } from '@/lib/tiles/profile'
 import { tileStore } from '@/lib/tiles/tileStore'
 
 interface DashboardProps {
@@ -19,11 +20,22 @@ interface DashboardProps {
 const MAKE_IT_YOURS_PROMPT =
   "Make this dashboard MINE. Before you touch anything, talk it through with me — one question at a time: do I keep the gem avatar? The art on each tile? The mentor tile's design? The background (mountains + particles)? Then ask how I want it to FEEL — mood, colors, energy. Only after my answers: strip every piece of Vitality style I let go of, restyle the board to me, and keep every tile and all my data working."
 
+type TabType = 'profile' | 'goals' | 'how' | 'yours' | 'data'
+
 function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => void }) {
-  const [tab, setTab] = useState<'how' | 'yours' | 'data'>('how')
+  const [tab, setTab] = useState<TabType>('profile')
   const [copied, setCopied] = useState<string | null>(null)
   const [dataIds, setDataIds] = useState<string[]>([])
   const [armed, setArmed] = useState(false)
+
+  // Profile state
+  const [prof, setProf] = useState<Profile>(() => profile())
+  const [profSaved, setProfSaved] = useState(false)
+
+  // Goals state
+  const [goalList, setGoalList] = useState<Goal[]>(() => goals())
+  const [selectedGId, setSelectedGId] = useState<string>(() => activeGoalId() || (goals()[0]?.id ?? ''))
+  const [goalsSaved, setGoalsSaved] = useState(false)
 
   useEffect(() => {
     setDataIds(tileStore.listDataIds(userId))
@@ -34,6 +46,20 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
       setCopied(tag)
       window.setTimeout(() => setCopied(null), 1600)
     })
+  }
+
+  const handleSaveProfile = () => {
+    saveProfile(prof)
+    setProfSaved(true)
+    window.setTimeout(() => setProfSaved(false), 2000)
+  }
+
+  const handleSaveGoals = () => {
+    saveGoals(goalList)
+    setActiveGoalId(selectedGId)
+    setGoalsSaved(true)
+    window.dispatchEvent(new Event('vitality:goal'))
+    window.setTimeout(() => setGoalsSaved(false), 2000)
   }
 
   const wipeOne = async (id: string) => {
@@ -50,7 +76,7 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
     fontFamily: 'ui-monospace, Menlo, monospace',
     letterSpacing: '.08em',
   }
-  const pill = (id: 'how' | 'yours' | 'data', label: string) => (
+  const pill = (id: TabType, label: string) => (
     <button
       key={id}
       type="button"
@@ -66,27 +92,176 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
     </button>
   )
 
+  const currentGoal = goalList.find((g) => g.id === selectedGId) ?? goalList[0]
+
+  const updateWeight = (tileKey: string, val: number) => {
+    setGoalList((prev) =>
+      prev.map((g) =>
+        g.id === selectedGId
+          ? { ...g, weights: { ...g.weights, [tileKey]: val } }
+          : g
+      )
+    )
+  }
+
   return (
     <div
       role="dialog" aria-modal="true" aria-label="Settings"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
-      style={{ position: 'fixed', inset: 0, zIndex: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'rgba(0,0,0,.62)', backdropFilter: 'blur(6px)' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(0,0,0,.62)', backdropFilter: 'blur(6px)' }}
     >
-      <div style={{ width: 'min(520px, 100%)', background: 'var(--bg-elevated, #121212)', border: '1px solid var(--border, #262626)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,.6)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px 10px', borderBottom: '1px solid var(--border, #262626)' }}>
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {pill('how', 'How it works')}
-            {pill('yours', 'Make it yours')}
-            {pill('data', 'Tile data')}
+      <div style={{ width: 'min(540px, 100%)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-elevated, #121212)', border: '1px solid var(--border, #262626)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,.6)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px 10px', borderBottom: '1px solid var(--border, #262626)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: 2, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', maxWidth: 'calc(100% - 36px)' }}>
+            {pill('profile', 'Perfil')}
+            {pill('goals', 'Ecuación')}
+            {pill('data', 'Datos')}
+            {pill('how', 'Info')}
+            {pill('yours', 'Estilo')}
           </div>
           <button type="button" aria-label="Close" onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--muted, #8a8f98)', cursor: 'pointer', padding: 4, display: 'flex' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" /></svg>
           </button>
         </div>
 
-        {tab === 'how' && (
-          <div style={{ padding: '22px 24px' }}>
-            <p style={{ fontWeight: 600, color: 'var(--fg, #fff)', margin: '0 0 8px', fontSize: 15 }}>Your board renders. I think.</p>
+        <div style={{ overflowY: 'auto', padding: '20px 24px' }}>
+          {tab === 'profile' && (
+            <div>
+              <p style={{ fontWeight: 600, color: 'var(--fg, #fff)', margin: '0 0 14px', fontSize: 15 }}>Perfil de Usuario</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nombre</label>
+                  <input
+                    type="text"
+                    value={prof.name ?? ''}
+                    onChange={(e) => setProf({ ...prof, name: e.target.value })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'var(--bg, #000)', border: '1px solid var(--border, #262626)', color: 'var(--fg, #fff)', fontSize: 16 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Edad</label>
+                  <input
+                    type="number"
+                    value={prof.age ?? ''}
+                    onChange={(e) => setProf({ ...prof, age: Number(e.target.value) })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'var(--bg, #000)', border: '1px solid var(--border, #262626)', color: 'var(--fg, #fff)', fontSize: 16 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Peso (kg)</label>
+                  <input
+                    type="number"
+                    value={prof.weightKg ?? ''}
+                    onChange={(e) => setProf({ ...prof, weightKg: Number(e.target.value) })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'var(--bg, #000)', border: '1px solid var(--border, #262626)', color: 'var(--fg, #fff)', fontSize: 16 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Altura (cm)</label>
+                  <input
+                    type="number"
+                    value={prof.heightCm ?? ''}
+                    onChange={(e) => setProf({ ...prof, heightCm: Number(e.target.value) })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'var(--bg, #000)', border: '1px solid var(--border, #262626)', color: 'var(--fg, #fff)', fontSize: 16 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Sexo</label>
+                  <select
+                    value={prof.sex ?? 'male'}
+                    onChange={(e) => setProf({ ...prof, sex: e.target.value as 'male' | 'female' })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'var(--bg, #000)', border: '1px solid var(--border, #262626)', color: 'var(--fg, #fff)', fontSize: 16 }}
+                  >
+                    <option value="male">Masculino</option>
+                    <option value="female">Femenino</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Unidades</label>
+                  <select
+                    value={prof.units ?? 'metric'}
+                    onChange={(e) => setProf({ ...prof, units: e.target.value as 'metric' | 'imperial' })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'var(--bg, #000)', border: '1px solid var(--border, #262626)', color: 'var(--fg, #fff)', fontSize: 16 }}
+                  >
+                    <option value="metric">Métrico (kg, cm)</option>
+                    <option value="imperial">Imperial (lbs, ft)</option>
+                  </select>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveProfile}
+                style={{ width: '100%', marginTop: 20, padding: '0.7rem 1rem', borderRadius: 999, background: 'var(--mint, #6EE7B7)', color: 'var(--mint-ink, #042a1c)', border: 'none', fontWeight: 600, cursor: 'pointer' }}
+              >
+                {profSaved ? 'Guardado ✓' : 'Guardar Perfil'}
+              </button>
+            </div>
+          )}
+
+          {tab === 'goals' && (
+            <div>
+              <p style={{ fontWeight: 600, color: 'var(--fg, #fff)', margin: '0 0 14px', fontSize: 15 }}>Meta Activa & Pesos de Ecuación</p>
+              
+              <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Seleccionar Meta Activa</label>
+              <select
+                value={selectedGId}
+                onChange={(e) => setSelectedGId(e.target.value)}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'var(--bg, #000)', border: '1px solid var(--border, #262626)', color: 'var(--fg, #fff)', fontSize: 16, marginBottom: 16 }}
+              >
+                {goalList.map((g) => (
+                  <option key={g.id} value={g.id}>{g.title}</option>
+                ))}
+              </select>
+
+              {currentGoal && (
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nombre de la Meta</label>
+                  <input
+                    type="text"
+                    value={currentGoal.title}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setGoalList((prev) => prev.map((g) => g.id === selectedGId ? { ...g, title: val } : g))
+                    }}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'var(--bg, #000)', border: '1px solid var(--border, #262626)', color: 'var(--fg, #fff)', fontSize: 16, marginBottom: 16 }}
+                  />
+
+                  <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>Pesos por Tile (%):</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {['train', 'fuel', 'vitals', 'peak', 'finance'].map((tileKey) => {
+                      const weightVal = currentGoal.weights?.[tileKey] ?? 0
+                      return (
+                        <div key={tileKey} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                          <span style={{ fontSize: 13, textTransform: 'capitalize', color: 'var(--fg)', width: 70 }}>{tileKey}</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={weightVal}
+                            onChange={(e) => updateWeight(tileKey, Number(e.target.value))}
+                            style={{ flex: 1, accentColor: 'var(--mint, #6EE7B7)' }}
+                          />
+                          <span style={{ fontSize: 13, color: 'var(--mint)', width: 40, textAlign: 'right' }}>{weightVal}%</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleSaveGoals}
+                style={{ width: '100%', marginTop: 20, padding: '0.7rem 1rem', borderRadius: 999, background: 'var(--mint, #6EE7B7)', color: 'var(--mint-ink, #042a1c)', border: 'none', fontWeight: 600, cursor: 'pointer' }}
+              >
+                {goalsSaved ? 'Guardado ✓' : 'Guardar Cambios en Ecuación'}
+              </button>
+            </div>
+          )}
+
+          {tab === 'how' && (
+            <div>
+              <p style={{ fontWeight: 600, color: 'var(--fg, #fff)', margin: '0 0 8px', fontSize: 15 }}>Your board renders. I think.</p>
             <p style={{ color: 'var(--muted)', lineHeight: 1.65, margin: 0, fontSize: 13.5 }}>
               I work as a loop: data runs <strong style={{ color: 'var(--fg)' }}>back and forth</strong>{' '}
               between your dashboard and me. I read what your tiles saved, retune your weights, goals and notices,
@@ -151,6 +326,7 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
             )}
           </div>
         )}
+        </div>
       </div>
     </div>
   )
@@ -188,9 +364,9 @@ function NotesSection() {
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') addNote() }}
           placeholder="Write a note..."
-          style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border, #262626)', background: 'var(--bg, #0a0a0a)', color: 'var(--fg, #fff)', fontSize: 14, outline: 'none' }}
+          style={{ flex: 1, padding: '10px 14px', minHeight: 42, borderRadius: 8, border: '1px solid var(--border, #262626)', background: 'var(--bg, #0a0a0a)', color: 'var(--fg, #fff)', fontSize: 16, outline: 'none' }}
         />
-        <button onClick={addNote} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--mint, #6EE7B7)', color: 'var(--mint-ink, #042a1c)', fontWeight: 600, cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap' }}>
+        <button onClick={addNote} style={{ padding: '10px 18px', minHeight: 42, borderRadius: 8, border: 'none', background: 'var(--mint, #6EE7B7)', color: 'var(--mint-ink, #042a1c)', fontWeight: 600, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap' }}>
           Add
         </button>
       </div>
@@ -249,9 +425,9 @@ function TasksSection() {
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') addTask() }}
           placeholder="Add a task..."
-          style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border, #262626)', background: 'var(--bg, #0a0a0a)', color: 'var(--fg, #fff)', fontSize: 14, outline: 'none' }}
+          style={{ flex: 1, padding: '10px 14px', minHeight: 42, borderRadius: 8, border: '1px solid var(--border, #262626)', background: 'var(--bg, #0a0a0a)', color: 'var(--fg, #fff)', fontSize: 16, outline: 'none' }}
         />
-        <button onClick={addTask} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--mint, #6EE7B7)', color: 'var(--mint-ink, #042a1c)', fontWeight: 600, cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap' }}>
+        <button onClick={addTask} style={{ padding: '10px 18px', minHeight: 42, borderRadius: 8, border: 'none', background: 'var(--mint, #6EE7B7)', color: 'var(--mint-ink, #042a1c)', fontWeight: 600, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap' }}>
           Add
         </button>
       </div>

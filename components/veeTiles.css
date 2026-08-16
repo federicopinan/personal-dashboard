@@ -51,7 +51,20 @@
 /* phone = 2 cols. The packer clamps each tile's width to 2 (a 3-wide hero fills the
    row) and re-packs; --cols here keeps the CSS cell math in lockstep with it. */
 @media (max-width:760px){
-  .veeTiles .grid{--cols:2;--rowh:max(124px,30vw)}
+  .veeTiles .grid{--cols:2;--rowh:max(120px,28vw);--gap:12px;}
+  .veeTiles .tile{border-radius:16px;}
+  .veeTiles .index{top:12px;left:14px;font-size:9px;}
+  .veeTiles .glyph{top:10px;right:12px;width:18px;height:18px;}
+  .veeTiles .label{left:14px;bottom:12px;font-size:18px;}
+  .veeTiles .stat{left:14px;bottom:36px;font-size:14px;}
+  .veeTiles .cap{left:14px;bottom:12px;}
+  .veeTiles .arrow{right:12px;bottom:12px;}
+  .veeTiles .tile.live .cap{flex-direction:column;align-items:flex-start;gap:2px;}
+}
+@media (max-width:480px){
+  .veeTiles .grid{--gap:10px;--rowh:max(110px,26vw);}
+  .veeTiles .label{font-size:16px;}
+  .veeTiles .stat{font-size:13px;}
 }
 
 /* Tiles read as translucent glass that sits IN the world: a see-through tinted

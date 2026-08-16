@@ -8,17 +8,8 @@ to a blank canvas if you'd rather build from nothing.
 
 **No backend. No login. No accounts.** Fork it, deploy it, done.
 
-## The videos
-
-You don't need a video to get running — paste the seed prompt into Claude Code
-in an empty folder and the AI Mentor takes you the whole way. The videos show
-the **vision in motion**: each episode adds one input tile to the equation.
-
-▶ **EP1 — Your life is an equation:** _link lands here with the first video_
-
-🧪 **The Lab** (everything you can add): https://vitality-jade.vercel.app/demo
-
 ---
+
 
 ## Deploy in 2 minutes
 
@@ -75,11 +66,8 @@ Then open http://localhost:3000. Requires Node 20+ (see `.nvmrc`).
 Click any tile and it opens a panel telling you how to build it. Each tile is a slot
 that fills when a file exists at `public/tiles/<slot>.html`. Two ways to fill one:
 
-- **Follow a build.** Each episode ships a slash command (e.g. `/logger`).
-  Drop it into `.claude/commands/`, run it in Claude Code, and it writes the tile
-  straight into the right slot. Commit, redeploy, and it appears.
-- **Build your own.** Run [`/tile <slot>`](.claude/commands/tile.md) in Claude Code
-  (or ask it to build a `<slot>` tile and save it to `public/tiles/<slot>.html`).
+- **Use predefined library tiles.** Copy any tile from `tiles-library/` into `public/tiles/<slot>.html`.
+- **Build custom tiles.** Run `/tile <slot>` or create a `<slot>` tile and save it to `public/tiles/<slot>.html`.
 
 A tile is one self-contained HTML file. It saves its own data through the dashboard
 bridge, `window.Vitality.save()` and `window.Vitality.load()`, which the dashboard

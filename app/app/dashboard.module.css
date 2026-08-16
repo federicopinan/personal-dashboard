@@ -22,6 +22,15 @@
   overflow: hidden;
 }
 
+@media (max-width: 560px) {
+  .page {
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
+    padding-top: calc(var(--space-6) + env(safe-area-inset-top));
+    padding-bottom: calc(var(--space-8) + env(safe-area-inset-bottom));
+  }
+}
+
 /* Top-right settings gear — opens the shared SettingsSheet (Personal,
    training setup, units toggle). Same icon language as the logger
    pages so the entry point reads identically wherever it sits. */
@@ -499,40 +508,37 @@
 
 @media (max-width: 560px) {
   .headerRow {
-    gap: var(--space-4);
+    gap: var(--space-3);
+    align-items: center;
   }
   .headerGem {
-    width: 100px;
-    height: 100px;
+    width: 64px;
+    height: 64px;
   }
-  /* Let the greeting shrink/wrap instead of running underneath the gear. */
+  /* Let the greeting shrink/wrap cleanly. */
   .header {
     min-width: 0;
+    flex: 1;
   }
   .greeting {
-    font-size: clamp(1.85rem, 7vw, 2.3rem);
+    font-size: clamp(1.4rem, 5.5vw, 1.9rem);
   }
-  /* Gear joins the header flow on phone: vertically centered with the gem +
-     greeting, pushed to the far right. No more floating, misaligned corner
-     icon overlapping the text. */
+  .profileAvatar {
+    position: static;
+    flex: 0 0 auto;
+    align-self: center;
+    margin-left: auto;
+    width: 38px;
+    height: 38px;
+  }
   .settingsBtn {
     position: static;
     flex: 0 0 auto;
     align-self: center;
     margin-left: auto;
   }
-  /* Avatar joins the header flow on phone too: it takes the auto margin so the
-     avatar + gear sit together as a right-aligned cluster. */
-  .profileAvatar {
-    position: static;
-    flex: 0 0 auto;
-    align-self: center;
-    margin-left: auto;
-    width: 36px;
-    height: 36px;
-  }
   .profileAvatar + .settingsBtn {
-    margin-left: var(--space-3);
+    margin-left: var(--space-2);
   }
 }
 
