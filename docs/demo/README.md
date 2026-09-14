@@ -9,7 +9,7 @@ was and what it linked to.
 |------|------|
 | `index.html` | **Lab entry.** Linked from DashboardGrid "+ New tile" → "Design Lab". Tabbed page: Install (copy command), Logger (iframe), Stack (iframe), Radar (iframe). Theme: dark, mint `#6EE7B7`, Instrument Serif + JetBrains Mono. |
 | `customize-demo.html` | **Phone mockup.** Interactive dashboard customization demo: edit greeting, pick wallpaper, choose accent color. Originally used for the "Make it yours" flow. |
-| `backend.sql` | Supabase schema shown in the lab (same as root `backend.sql`). |
+| `backend.sql` | Historical Supabase schema shown in the lab; it was removed with the connector. |
 | `lab/logger.html` | Full workout logger preview (standalone sealed HTML). Embeds the exact same code as `code/the-living-logger.html`. |
 | `lab/stack.html` | Supplement stack preview. Embeds the stack code from the arsenal. |
 | `lab/subs.html` | Subscription radar preview. |
@@ -41,3 +41,12 @@ Used in the `NewTileOverlay` component — the "Design Lab →" link.
 - The "Install" tab showed the one-liner curl command to get the arsenal
 - The Logger tab embedded logger.html in an exhibit iframe
 - Season badges showed S1/S2 episode counts per tab
+
+## Status as of the Netlify/localStorage migration
+
+- `backend.sql` is a no-op now (the connector it backed is gone).
+- The /logger, /stack, /radar install commands point to on-device / file-edit
+  flows in their tiles; the Lab iframe exhibits still preview the same code.
+- The "Install" tab command still pulls `the-arsenal.zip` from the public
+  Vitality lab CDN for users who want the full arsenal source, but the
+  dashboard itself doesn't need any of it to render.

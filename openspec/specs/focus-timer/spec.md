@@ -1,5 +1,15 @@
 # Focus Timer Specification
 
+> **ARCHIVE NOTICE (2026-07-15)** — This spec describes a vanilla HTML/CSS/JS PWA
+> focus timer with its own `focus:sessions` localStorage key, IDLE/ACTIVE state,
+> a sticky banner, and a violet day-ring arc. None of those files live in the
+> current Next.js 14 (App Router) + React 18 + TypeScript repo
+> (`focus-timer.js` and `single-thing.js` do not exist). The actual focus/timer
+> work, if any, would live inside a sealed tile shipped from
+> `public/tiles/<slot>.html` and tracked in `vitality:me:tile:<slot>:data`.
+> Preserved verbatim for historical traceability. Do not promote new requirements
+> here.
+
 ### Requirement: Preset Duration Selection
 
 The system SHALL provide five preset duration buttons: 15, 25, 30, 45, and 90 minutes. Each button MUST store its duration in seconds (900, 1500, 1800, 2700, 5400 respectively) and MUST be tappable with a single action.

@@ -1,5 +1,16 @@
 # Subscriptions Specification
 
+> **ARCHIVE NOTICE (2026-07-15)** — This spec describes a subscription-tracker
+> feature with ARS/USD-only currency rules, persisted under the
+> `subscriptions:v1` localStorage key, authored for a vanilla HTML/CSS/JS PWA
+> dashboard. The actual project today is Next.js 14 + React 18 + TypeScript;
+> subscription behavior, if present, would live inside the Finance sealed
+> tile (`public/tiles/finance.html`) and be tracked in
+> `vitality:me:tile:finance:data` through the host bridge
+> (`window.Vitality.save` / `window.Vitality.load`). No ARS/USD currency
+> restriction is enforced by the base today. Preserved verbatim for
+> historical traceability. Do not promote new requirements here.
+
 ## Purpose
 
 The Subscriptions capability SHALL track recurring charges on the dashboard and SHALL enforce the app-wide Argentina currency rule: only ARS and USD are user-facing currencies, with ARS as the default for new records.

@@ -31,8 +31,8 @@ pnpm-debug.log*
 .env.local
 .env*.local
 
-# vercel
-.vercel
+# netlify
+.netlify
 
 # typescript
 *.tsbuildinfo
@@ -48,9 +48,6 @@ next-env.d.ts
 .claude/commands/.*
 !.claude/commands/*.md
 !.claude/settings.json
-
-# personal MCP connection (contains a per-user vitm_ token — never commit)
-.mcp.json
 
 # git worktrees (parallel Claude Code sessions)
 .worktrees/
@@ -76,10 +73,6 @@ public/*-concepts.html
 # Build-script caches (large external datasets — re-fetched on rebuild)
 scripts/data/
 
-# Supabase CLI local state (auth + project link cached in ~/.supabase/;
-# this dir is per-clone scratch, never source of truth)
-supabase/.temp/
-
 # Per-developer IDE config (live-server port, etc.)
 .vscode/
 
@@ -97,4 +90,3 @@ public/*-preview.html
 
 # local tool config (pi, atl — never committed)
 .pi/
-

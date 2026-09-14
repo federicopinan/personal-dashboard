@@ -1,17 +1,13 @@
 import type { Tile, TileData, TileEnvelope, ReportKind } from './types'
 import { tileSkin, type Skin } from './tileSkin'
-import { supa } from './tileSupabase'
 
 /**
  * tileStore is the ONLY module that touches persistence for user tiles.
  *
- * v1 is localStorage, scoped per user. Swapping this one module to Supabase
- * later never touches a tile or the host. Every key is namespaced by userId so
- * one user can never read another's tiles (multi-user from the ground up).
- * Note: localStorage has no cross-user isolation on a shared device, so v1 is
- * single-device. The Supabase swap adds RLS:
- *   tiles(id, user_id, name, html, created_at, updated_at)
- *   tile_data(tile_id, user_id, data jsonb)
+ * The dashboard is local-only: this module writes to the browser's
+ * localStorage, namespaced by userId so different forks don't collide on the
+ * same device. Netlify (the documented deployment target) cannot host a
+ * backend, so there is no cloud lane — data stays in the browser, per device.
  *
  * Keys:
  *   vitality:<userId>:tiles            -> Tile[]  (the index, source order)
@@ -157,11 +153,10 @@ function importTile(userId: string, envelope: TileEnvelope): Tile | null {
 }
 
 /**
- * Adopt a tile that already has an id (e.g. one pulled from the server `tiles`
- * table — an MCP-built or cross-device tile). No-op if a tile with that id is
- * already in the local index, so a re-sync never duplicates. Additive: the
- * localStorage v1 stays the source for everything else; this just lets the
- * server sync layer (lib/tiles/tileSync.ts) fold server rows into the index.
+ * Adopt a tile that already has an id (e.g. one imported from a shared export
+ * bundle). No-op if a tile with that id is already in the local index, so a
+ * re-import never duplicates. Additive: the localStorage v1 stays the source
+ * for everything else; this just folds an imported tile into the index.
  */
 function adoptTile(userId: string, tile: Tile): boolean {
   const list = readIndex(userId)
@@ -172,12 +167,10 @@ function adoptTile(userId: string, tile: Tile): boolean {
 }
 
 /**
- * Fold a server tile into the local index with last-write-wins: adopt it if new,
- * overwrite the local copy when the server row is STRICTLY newer (a cross-device
- * edit made elsewhere), else leave the newer-or-equal local copy untouched (a
- * local edit still wins). Preserves the server `updatedAt` so timestamps stay
- * comparable across devices. Used by the sync layer instead of adoptTile so an
- * edit made on another device actually reaches this one.
+ * Fold an imported tile into the local index with last-write-wins: adopt it
+ * if new, overwrite the local copy when the imported row is STRICTLY newer,
+ * else leave the newer-or-equal local copy untouched (a local edit still
+ * wins). Preserves the imported `updatedAt` so timestamps stay comparable.
  */
 function syncServerTile(userId: string, tile: Tile): 'new' | 'updated' | 'stale' {
   const list = readIndex(userId)
@@ -236,20 +229,8 @@ const MAX_TILE_DATA = 512 * 1024 // ~512KB per tile, protects the shared localSt
 
 /** Persist a tile's data. Returns whether the write actually landed so callers
  *  never tell the user "Saved" for a payload that was silently dropped (oversized
- *  or quota-blocked). When a Supabase project is configured (env vars present) the
- *  write goes there so it syncs across devices; otherwise it stays in localStorage. */
+ *  or quota-blocked). localStorage only — the dashboard is local-only. */
 async function saveData(userId: string, id: string, data: TileData): Promise<boolean> {
-  const db = supa()
-  if (db) {
-    try {
-      const { error } = await db
-        .from('tile_data')
-        .upsert({ tile_id: `${userId}:${id}`, data, updated_at: new Date().toISOString() })
-      return !error
-    } catch {
-      return false
-    }
-  }
   if (!hasStorage()) return false
   try {
     const json = JSON.stringify(data)
@@ -263,20 +244,6 @@ async function saveData(userId: string, id: string, data: TileData): Promise<boo
 }
 
 async function loadData(userId: string, id: string): Promise<TileData> {
-  const db = supa()
-  if (db) {
-    try {
-      const { data, error } = await db
-        .from('tile_data')
-        .select('data')
-        .eq('tile_id', `${userId}:${id}`)
-        .maybeSingle()
-      if (error || !data) return []
-      return (data.data as TileData) ?? []
-    } catch {
-      return []
-    }
-  }
   if (!hasStorage()) return []
   try {
     const raw = window.localStorage.getItem(dataKey(userId, id))
@@ -289,8 +256,7 @@ async function loadData(userId: string, id: string): Promise<TileData> {
 /**
  * Which tiles currently HAVE saved data (localStorage scan). Powers the gear
  * panel's "wipe the demo data" list: every id here still keeps its card — only
- * what's inside can be detonated. Supabase-synced data won't appear in this
- * scan (v1), but clearData still clears both stores.
+ * what's inside can be detonated.
  */
 function listDataIds(userId: string): string[] {
   if (!hasStorage()) return []
@@ -311,18 +277,9 @@ function listDataIds(userId: string): string[] {
 
 /**
  * Detonate what's INSIDE a tile — the card survives, its data goes black.
- * Clears both stores (Supabase row if configured, localStorage always) so the
- * tile renders its empty state on next load.
+ * Clears the localStorage row so the tile renders its empty state on next load.
  */
 async function clearData(userId: string, id: string): Promise<void> {
-  const db = supa()
-  if (db) {
-    try {
-      await db.from('tile_data').delete().eq('tile_id', `${userId}:${id}`)
-    } catch {
-      /* network fail — still clear local below */
-    }
-  }
   if (!hasStorage()) return
   try {
     window.localStorage.removeItem(dataKey(userId, id))
@@ -351,8 +308,7 @@ async function migrateLegacy(userId: string, defaultHtml: string): Promise<Tile 
     return undefined
   }
   const tile = createTile(userId, { name: 'My first tile', html: defaultHtml })
-  // Confirm the write landed before dropping the only copy of the legacy data
-  // (the Supabase path is a network write, so a fire-and-forget delete could lose it).
+  // Confirm the write landed before dropping the only copy of the legacy data.
   const ok = await saveData(userId, tile.id, legacyData)
   if (ok) {
     try {

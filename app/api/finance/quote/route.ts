@@ -1,9 +1,14 @@
 /**
  * Stock quote — server-side so the Finnhub API key never reaches the browser.
- * Reads FINNHUB_API_KEY (.env.local locally, Vercel env in prod) and returns
- * only the latest price for one symbol. No key → { error: 'no_key' } so the
- * finance tile can tell the user to add a free one. The tile calls this through
- * the host bridge (window.Vitality.stock) — a sealed tile can't fetch.
+ * Reads FINNHUB_API_KEY from `.env.local` (or the deployment platform's env
+ * settings) and returns only the latest price for one symbol. No key →
+ * { error: 'no_key' } so the finance tile can tell the user to add a free one.
+ * The tile calls this through the host bridge (window.Vitality.stock) — a
+ * sealed tile can't fetch.
+ *
+ * Netlify deployment: set FINNHUB_API_KEY in Netlify → Site settings →
+ * Environment variables. The key stays server-side; the deployed bundle never
+ * includes it.
  */
 export async function GET(req: Request): Promise<Response> {
   const key = process.env.FINNHUB_API_KEY

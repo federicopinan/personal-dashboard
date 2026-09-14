@@ -40,9 +40,9 @@ await window.Vitality.save(myData)         // persist
 const data = await window.Vitality.load()  // read it back, returns [] when empty
 ```
 
-By default this saves in the browser. If the dashboard owner has added a Supabase
-project (see the main README), the same calls sync across devices with no change to
-your tile.
+By default this saves in the browser. There is no cloud lane — the dashboard is
+local-only — so the data lives in this device's localStorage and stays with the
+device.
 
 ## Two ways to fill a slot
 

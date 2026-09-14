@@ -28,5 +28,11 @@ Rules (the Sealed Tile Contract):
 4. On load, call `window.Vitality.load()` first and render whatever comes back, so the tile
    restores its state every time it opens.
 
+The dashboard is local-only now (Netlify is the documented deployment target and a
+serverless function cannot persist into a browser's localStorage), so tile data lives
+in the browser's localStorage through the bridge above. There is no Supabase, no MCP
+connector, no backend to wire into. The tile ships in the repo; the user reloads
+and it appears.
+
 After writing the file, tell the user to commit and reload the dashboard so the `<slot>` tile
 fills.

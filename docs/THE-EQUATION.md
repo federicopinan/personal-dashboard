@@ -26,24 +26,30 @@ every tile is an input you feed, and the Mentor notices everything.
   (`vitality:eq:order` / `vitality:eq:removed`).
 - **Weights:** `lib/tiles/weights.ts` — plain numbers shown ≈ N% on each tile.
   **No AI key at runtime.** The user tells Claude Code their goal; Claude re-runs the
-  math and edits the file (or a goals UI / the connector writes the
-  `vitality:weights` localStorage override).
+  math and edits the file (or a goals UI edits the
+  `vitality:goals` localStorage override).
 
 ## Data-in — the teaching core ("the biggest problem")
 
 Sealed tiles can't fetch (sandboxed, no network). So ALL automation flows one lane:
 
-> **Tile = the gauge. One data table = the pipe. Claude = the robot that fills it.**
+> **Tile = the gauge. One bridge = the pipe. Claude = the robot that fills it.**
 
 | Lane | How | Status |
 |---|---|---|
-| Manual | type in the tile → `Vitality.save()` | works |
+| Manual | type in the tile → `Vitality.save()` → localStorage | works |
 | Claude in VS Code | ask Claude to write data / edit the tile | works |
-| MCP fill | connector `create_tile`/`read_tile` (edit tiles by talking) | works |
-| **Scheduled sweeps + API keys** | claude.ai scheduled task holds the key (Finnhub, YouTube), fetches, pushes into the tile's data via the connector | **GAP: connector has NO `save_data`/`read_data` tools — build these next** |
+| **File edits** | Claude edits `public/tiles/<slot>.html` and the tile picks it up on reload | works |
 
-Canonical episode demo: *finances → Finnhub key → scheduled Claude task → stocks tile
-updates itself every morning.* Same recipe, infinite tiles.
+The historical connector lane (MCP `create_tile` / `read_tile` / `save_data` /
+`read_data` → server-side Supabase backend) is retired in the
+Netlify/localStorage migration: a serverless function cannot persist server
+writes into a browser's localStorage, so the connector had nowhere to land.
+The dashboard is local-only by design today.
+
+Canonical local recipe: *finances → Finnhub key → edit the Finance tile to
+read its own source (a CSV they paste, an exported brokerage file) and write
+through `window.Vitality.save`* — same shape, no cloud lane.
 
 ## The Mentor (y) — next build
 
@@ -64,15 +70,21 @@ updates itself every morning.* Same recipe, infinite tiles.
   `/command` (e.g. `/logger`, `/finance`): run it and the tile lands in your row.
   Some free, most blurred behind the paywall. The **tile-customize / skin editor**
   (already built in the main app) becomes a paid Design Lab button too.
-- **Each episode = one new input tile + one data-in method** (manual → MCP → API key →
-  scheduled sweep). That's the content engine and the income.
+- **Each episode = one new input tile + one data-in method** (manual → file
+  edit → on-tile paste/import → on-device read of a user-supplied file).
+  That's the content engine and the income.
 - Patreon: https://www.patreon.com/cw/RowanTBK/shop · prod: https://vitality-jade.vercel.app
 
 ## Next steps (in order)
 
-1. **Connector data tools:** add `save_data(slot, data)` + `read_data(slot)` to
-   `app/api/mcp/[transport]/route.ts` (mirror the tiles-table pattern onto `tile_data`)
-   → unlocks scheduled sweeps end-to-end.
-2. **Mentor goal UI + deterministic Peak score** (goal, weights editor, Σ w·x, per-tile %).
-3. **Prove one sweep on camera:** Finnhub → finance tile, scheduled task, no key in the app.
+1. **Deterministic tile scores** (each tile reports 0–100 through `Vitality.report`;
+   Mentor aggregates `Σ w·x / 100` and shows per-tile contribution). Server-side
+   `tile_data` writes are gone with the connector — score aggregation is purely
+   client-side over localStorage.
+2. **Mentor goal UI + on-device patterns** (goal, weights editor, Σ w·x, per-tile %).
+   Patterns are computed by the mentor (Claude Code) at write time, not by the app
+   at runtime, and land in the noticed feed through the same localStorage write path.
+3. **Prove one on-tile data flow on camera:** Finnhub → edit the finance tile to
+   read its own CSV paste → tile updates itself every time the user pastes a new
+   export. No key in the app, no cloud lane.
 4. Dynamic slots (beyond the fixed 6) so every future episode adds a brand-new tile.

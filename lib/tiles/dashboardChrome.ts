@@ -4,8 +4,7 @@
  * make the dashboard THEIRS, separate from homeLayout (which tiles) and tileSkin
  * (how each tile looks).
  *
- * v1 is localStorage, per user, mirroring tileStore / homeLayout / tileSkin so the
- * same Supabase swap seam applies later.
+ * Persistence is localStorage, per user — the dashboard is local-only.
  *
  * Key:
  *   vitality:<userId>:chrome  -> DashboardChrome (JSON)

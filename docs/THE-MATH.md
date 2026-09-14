@@ -2,8 +2,7 @@
 
 This is the mentor's arithmetic. Anyone with this dashboard gets the same
 math; only the data is theirs. No AI key at runtime — Claude Code computes
-at write time (on /sweep or when asked) and writes plain numbers; the board
-renders them.
+at write time (when asked) and writes plain numbers; the board renders them.
 
 ## 1 · Value right now: the equation
 
@@ -69,11 +68,14 @@ MUST agree, or the number flip-flops between refreshes:
 
 - **The tile, client-side (hardwired).** Peak reads the vitals slot on load
   (`window.Vitality.read('vitals')`) and derives today's recovery itself — no
-  connector, no sweep. This is why a bad night shows up the instant they
+  server, no sweep. This is why a bad night shows up the instant they
   refresh.
-- **The mentor, server-side (/sweep).** When the connector is on, the nightly
-  sweep writes the same recovery into `peak.whoop.recovery` so it's fresh even
-  when the app is closed.
+- **The mentor, write-time.** When Claude (Code) is in the folder, the user
+  asks for a sweep; Claude computes the same recovery from the vitals store
+  and either updates the peak store or tells the user what changed. The
+  dashboard never writes to a backend anymore — Netlify cannot persist
+  server writes into a browser's localStorage, so the historical `/sweep`
+  server-side path is gone (see `/sweep` for the on-device alternatives).
 
 Both use this EXACT formula. A device recovery (`whoopRecovery`, from WHOOP in
 Episode 2) wins outright; otherwise it's the two bone-simple manual inputs:
@@ -91,8 +93,8 @@ Episode 2) wins outright; otherwise it's the two bone-simple manual inputs:
 Peak then scales its whole curve by `k = 0.55 + (recovery/100)·0.65`. The
 canonical source is `estRecovery` in `tiles-library/vitals.html`; the verbatim
 copy is `recoveryFromVitals` in `peak.html`. Change one, change all three
-(both tiles + this doc + the /sweep step). Never round differently or add a
-term — matching is the whole point.
+(both tiles + this doc + the on-tile derivation). Never round differently or
+add a term — matching is the whole point.
 
 ## House rules
 

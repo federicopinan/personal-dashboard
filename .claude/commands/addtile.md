@@ -11,6 +11,11 @@ THE JOB: this brick is a whole file, not a snippet. Copy code/the-living-logger.
 
 If a target is given in $ARGUMENTS (for example: for my reading), keep the shape and adapt the data, units and labels to it.
 
-SAVING (do it for them, never make them write SQL): if their repo has Supabase wired, apply backend.sql to it (CLI if linked, else hand them the one paste for the SQL editor and wait). If not, offer a free Supabase, about 2 minutes, or keep it on-device. backend.sql is additive, safe to re-run, and row-level security means each account only sees its own rows.
+SAVING (this is local-only now — no SQL, no Supabase):
+  In a Vitality base fork, the brick lands in the browser's localStorage via
+  the tile's host bridge (`window.Vitality.save(data)` / `window.Vitality.load()`) — that's
+  it. There is no Supabase, no connector, no backend. If the user's repo is not
+  a Vitality fork, persist the way the target app already does; never invent a
+  Supabase/cloud lane that the brick doesn't already use.
 
 PROVE IT: run it and show it actually rendering + animating in this app (not just "it should work"), then tell me in one line where it lives and how to trigger it.

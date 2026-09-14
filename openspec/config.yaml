@@ -1,11 +1,24 @@
 schema: spec-driven
 
 context: |
-  Tech stack: vanilla HTML/CSS/JS PWA, no build step, no framework
-  Architecture: single-user mobile-first dashboard; pages: index, gym, water, weight, sleep, finance
-  Data: localStorage persistence; Netlify deploy with functions support
-  Style: dark theme, terminal/monospace aesthetic, CSS custom properties
-  Shared JS: topbar.js (nav), pwa.js (service worker registration), service-worker.js (PWA offline)
+  Tech stack: Next.js 14 (App Router) + React 18 + TypeScript + vanilla CSS,
+  with three.js for the header gem.
+  Architecture: single-user dashboard composed of one route (`app/page.tsx` →
+  `app/app/Dashboard.tsx`) with a sealed-tile grid and a Mentor overlay
+  (`app/mentor/`). All tiles are sandboxed `srcDoc` iframes that persist via
+  the host bridge (`window.Vitality.save` / `load`).
+  Data: browser `localStorage` ONLY — namespaced per user (`vitality:<userId>:...`).
+  The dashboard is local-only by design; Netlify (the documented deployment
+  target, see `netlify.toml` + `@netlify/plugin-nextjs`) cannot host a
+  backend that persists into a browser's localStorage, so there is no cloud
+  lane, no connector, no Supabase. The historical MCP/OAuth server at
+  `app/api/mcp/**` and the ingest endpoint at `app/api/ingest/route.ts` were
+  retired and removed in 2026-07. The one surviving server route is
+  `/api/finance/quote` (Finnhub, server-side key).
+  Style: dark theme, near-black background, mint accent `#6EE7B7`, serif
+  Georgia italic for emphasis, vanilla CSS custom properties.
+  Shared: `lib/tiles/*` (tile registry, store, host bridge, chrome), `app/`
+  (App Router), `public/tiles/<slot>.html` (sealed tile HTML).
 
 rules:
   proposal:
@@ -22,21 +35,33 @@ rules:
   apply:
     - Follow existing code patterns
     tdd: false
-    test_command: "node dashboard-shell.test.js"
   verify:
-    test_command: "node dashboard-shell.test.js"
-    build_command: ""
+    build_command: "npm run build"
     coverage_threshold: 0
   archive:
     - Warn before merging destructive deltas
 
 testing:
   strict_tdd: false
-  runner: "node"
-  unit: true
+  runner: "npm"
+  unit: false
   integration: false
   e2e: false
   coverage: false
   linter: false
-  type_checker: false
+  type_checker: true
   formatter: false
+
+# NOTE on tests + verification: this project ships no automated test suite
+# today. There is no `test_command`. Verification work is done by hand (a
+# browser check of the running dashboard) and by `npm run build`, which is
+# the authoritative gate — it runs the TypeScript compiler and catches
+# broken imports. `npm run lint` is wired in `package.json` but the project
+# ships no ESLint config, so on a fresh clone the script triggers Next.js's
+# first-time interactive setup wizard (it asks the user to pick an ESLint
+# style). Until an `.eslintrc*` or `eslint.config.*` is committed, do NOT
+# claim `npm run lint` works in CI — it does not, and asserting the
+# opposite would block a clean clone. If/when a config is added, set
+# `linter: true` here and add the script to the verification contract at
+# the same time so config never references a working script that does
+# not exist.

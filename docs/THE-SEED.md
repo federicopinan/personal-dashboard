@@ -11,6 +11,12 @@ The scaffold pulls `CLAUDE.md` into their folder, so the mentor persona is
 PERMANENT: every future Claude Code session in that folder wakes up as the
 mentor, with /vitality, /tile and /detonate in hand.
 
+The dashboard is **local-only** by design today. The documented deployment
+target is **Netlify** (the repo ships a `netlify.toml` + the Next.js plugin
+already wired). There is no cloud sync, no connector, no Supabase — every
+tile's saved data lives in the browser's localStorage through the host
+bridge. Step 5 below reflects that.
+
 ---
 
 ```
@@ -24,14 +30,14 @@ Introduce yourself in three lines, then build my world in this empty folder:
 1) npx --yes degit RowanThistlebrooke/vitality-base . --force
    (this hands you CLAUDE.md — your own instructions — plus ALL your commands
    from the very first run: /vitality (reinstall the full board), /tile (build
-   any tile), /detonate (blank canvas), /sweep (file data on your rounds), and
-   /update (safely pull the newest version any time, data untouched). Episode
-   commands from the Lab (like /finance) drop in on top of these.)
+   any tile), /detonate (blank canvas), and /update (safely pull the newest
+   version any time, data untouched). Episode commands from the Lab (like
+   /finance) drop in on top of these.)
 2) npm install — if node is missing or below 20, walk me through installing it
    first. While it installs (it takes a minute), put the wait to work: open the
-   free signup pages for GitHub, Supabase and Vercel in my browser
-   (github.com/signup, supabase.com, vercel.com/signup) and tell me to make all
-   three now — they're free, and they're what take this dashboard live later.
+   free signup pages for GitHub and Netlify in my browser
+   (github.com/signup, netlify.com) and tell me to make both now — they're
+   free, and they're what take this dashboard live later.
 3) npm run dev — then open it right here beside me in VS Code so I see it
    live next to the chat: hand me the localhost link, then walk me through
    Cmd/Ctrl+Shift+P → "Simple Browser: Show" → paste the link → right-click
@@ -47,17 +53,16 @@ Introduce yourself in three lines, then build my world in this empty folder:
    set my calorie targets for Fuel. Take every goal, polish my main one into
    one sharp sentence (the gold overall goal), weigh how much each tile moves
    each goal, and write them into lib/tiles/weights.ts so y is truly mine.
-5) Then get me live — and START WITH GITHUB: make the GitHub account first,
-   then sign into Vercel and Supabase WITH GitHub (one login for all three).
-   GitHub (you do all the git; my only job is the browser sign-in — and set my
-   commit identity REPO-LOCAL only, NEVER `git config --global`: use my GitHub
-   *noreply* email (`ID+username@users.noreply.github.com`, shown at GitHub →
-   Settings → Emails) so my very first push isn't blocked by GitHub's keep-my-
-   email-private protection [error GH007]), then Vercel
-   (import my repo, deploy to my own live URL, then Add to Home Screen so it's
-   an app on my phone), then Supabase (my memory: run supabase/sync.sql, add
-   the two NEXT_PUBLIC keys). Keep a checklist (SETUP.md) ticking; before each
-   step tell me if it's optional and what it gives me.
+5) Then get me live — START WITH GITHUB: make the GitHub account first,
+   then sign into Netlify WITH GitHub (one login for both). GitHub (you do all
+   the git; my only job is the browser sign-in — and set my commit identity
+   REPO-LOCAL only, NEVER `git config --global`: use my GitHub *noreply* email
+   (`ID+username@users.noreply.github.com`, shown at GitHub → Settings →
+   Emails) so my very first push isn't blocked by GitHub's keep-my-email-
+   private protection [error GH007]), then Netlify (import my repo, deploy to
+   my own live URL, then Add to Home Screen so it's an app on my phone). Keep a
+   checklist (SETUP.md) ticking; before each step tell me if it's optional and
+   what it gives me.
 6) Walk me through the Lab website (the Design Lab button on the board, or
    /demo) — it's expanding every day, and everything from their YouTube always
    shows up here for inspiration.
@@ -65,11 +70,14 @@ Introduce yourself in three lines, then build my world in this empty folder:
    /finance install (the subscription radar) drops in from the Lab.
 8) Then live-data keys, only if I want them: TikTok (keyless, just works),
    YouTube and Finnhub (my own free key each — you write .env.local for me).
+   The dashboard is local-only by design, so each browser holds its own copy
+   of my data; cross-device means pasting an export or editing a tile to read
+   its own user-supplied file.
 
 The moment my dashboard is up, tell me plainly: this is the vision — I can
 detonate all of it (/detonate) or build off of it; it's mine either way.
 
-Once I have EVERYTHING set up (live site, memory connected), remind me: you
+Once I have EVERYTHING set up (live site, data in my browser), remind me: you
 are all I need from here — their videos are the guide, you are the machine.
 Then close with Rowan's words, exactly:
 
@@ -90,7 +98,8 @@ can see everything I can add to this board? If yes, open it in my browser.
 2. **One line for new people:** "No dashboard yet? One paste in Claude Code —
    my mentor sets you up. First link below." (that's the seed — never shown)
 3. **The build** — this episode's input tile + ONE data-in method (manual →
-   MCP fill → API key → scheduled sweep, one per episode).
+   file edit → on-tile paste/import → on-device read of a user-supplied file,
+   one per episode).
 4. **The drop** — run the episode's /command; the tile lands in the row; the
    equation shot (x + x + x = y, the mentor notices).
 5. **The close** — "the builds we make in the dark are in the lab" → Patreon.

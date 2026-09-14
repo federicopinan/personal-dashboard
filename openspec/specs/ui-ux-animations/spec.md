@@ -1,5 +1,18 @@
 # UI/UX Animations Specification
 
+> **ARCHIVE NOTICE (2026-07-15)** — This spec describes page-transition,
+> 400ms numeric counters, goal-checklist pop, modal entry/exit, mobile dock,
+> and storage-cache behavior authored for a vanilla HTML/CSS/JS PWA
+> dashboard. The actual project today is Next.js 14 + React 18 + TypeScript;
+> the Dashboard grid renders with React state, CSS custom-property animation,
+> `requestAnimationFrame`-driven number rollups, and prefers-reduced-motion
+> guards, but it does not use the View Transitions API, does not paint the
+> page-to-page navigation dock described here, and does not implement the
+> centralized DOM selector cache or storage-cache wrapper. Some shape
+> overlaps (reduced-motion, passive listeners) survive in spirit; the contract
+> is not enforceable as written. Preserved verbatim for historical
+> traceability. Do not promote new requirements here.
+
 ## Purpose
 
 This specification establishes the requirements for premium UI/UX transitions, number counters, and interactive micro-animations. It standardizes behavior to ensure smooth, hardware-accelerated execution, zero layout shifts, and accessibility compliance.

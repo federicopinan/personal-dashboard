@@ -1,5 +1,17 @@
 # Single Thing Specification
 
+> **ARCHIVE NOTICE (2026-07-15)** — This spec describes a `singleThing:<YYYY-MM-DD>`
+> localStorage key for a single-text daily priority slot near goals, authored
+> for a vanilla HTML/CSS/JS PWA dashboard. The actual project today is
+> Next.js 14 + React 18 + TypeScript; "single thing" behavior, if desired,
+> would live inside a sealed tile shipped from `public/tiles/<slot>.html`
+> and tracked in `vitality:me:tile:<slot>:data`. The main Settings panel in
+> `app/app/Dashboard.tsx` exposes a Notes + Tasks section with similar shape
+> but uses ad-hoc localStorage keys (`vitality:notes`,
+> `vitality:tasks:<YYYY-MM-DD>`) and does not implement the contract below.
+> Preserved verbatim for historical traceability. Do not promote new
+> requirements here.
+
 ## Purpose
 
 The Single Thing capability provides one daily priority slot on the dashboard near goals. It MUST stay intentionally constrained to a single current-day item, persist within the same local date, support completion, and avoid carrying unfinished work into the next day.

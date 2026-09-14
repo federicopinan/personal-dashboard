@@ -20,14 +20,9 @@ extract its marked regions (@episode-start:chart, logger, library, rest-timer,
 session) when adapting to a target or a different stack. It is months of
 backtested code: keep its logic.
 
-DASHBOARD FRESHNESS (vitality-base forks only, check BEFORE the copy): open
-app/app/DashboardGrid.tsx and look for the string openFull. If it is missing,
-the fork is old and tiles open as a small popup card instead of full screen.
-Fix it first: add https://github.com/RowanThistlebrooke/vitality-base as a
-remote called upstream, merge its main branch (on conflict keep the user's
-public/tiles/ and content/site.ts), then push it together with the tile.
-Tell the user in one line: your dashboard was updated too, tiles now open
-full screen.
+The dashboard is local-only now — every tile persists through the host
+bridge into the browser's localStorage (see public/tiles/README.md). There is
+no Supabase, no connector, no backend to file into.
 
 The target is: $ARGUMENTS
 - No target: install as built (the copy above). In a Vitality repo, wire the
@@ -35,19 +30,28 @@ The target is: $ARGUMENTS
   report({ key:'workout', label:'Sessions', value: countThisWeek, date: todayKey, kind:'count' })
 - "update": pull the newest arsenal and refresh everything. Do this:
   1. curl -sL https://vitality-jade.vercel.app/lab/the-arsenal.zip -o /tmp/arsenal.zip && unzip -o /tmp/arsenal.zip -d .
-     (refreshes code/, backend.sql and every command in .claude/commands/)
+     (refreshes code/, and every command in .claude/commands/)
   2. Re-copy the right variant into place, same as install (tile.html for a
      dashboard tile, plain for an app).
-  3. Re-apply backend.sql (additive, safe to re-run). The user's data is never touched.
-  4. Tell them in one line what is new.
+  3. Tell them in one line what is new.
 - A target ("for my water"): keep the shape and rules, adapt the data, units and labels to it.
 
 RULE: add only, one saved store, nothing already there breaks.
 
-SAVING (do this for them, never make them write SQL):
-1. If this repo already has Supabase wired (env keys or supabase/ folder), apply backend.sql to it directly (CLI if linked, else their dashboard SQL editor: hand them the one paste and wait).
-2. If not, offer two paths: a free Supabase project (walk them through it, ~2 minutes) then apply backend.sql, or keep the on-device version that already works and add the cloud later.
-3. backend.sql is additive and safe to re-run. It stamps every row with their account (row-level security), so each person only ever sees their own data.
+SAVING (this is local-only now — no SQL, no Supabase):
+  The logger's data lands in the browser's localStorage under the `train`
+  slot via `window.Vitality.save(data)` / `await window.Vitality.load()`.
+  That's it. The user's tile is the only place it lives; opening the same
+  dashboard on another device will not see the data unless they manually
+  move it (see "DATAFLOW ACROSS DEVICES" below).
+
+  DATAFLOW ACROSS DEVICES: if they ask for cross-device sync, surface that
+  the dashboard is local-only by design today (Netlify is the documented
+  deployment target and a serverless function cannot persist into a
+  browser's localStorage). Offer two paths: (1) export the logger's saved
+  JSON from one device and paste it into the other (a one-line flow the
+  tile can add); or (2) move to a backend they host elsewhere. Do not
+  improvise a connector path — there isn't one.
 
 DO: place the code (copy by default, adapt only when needed); set up saving as above; wire the tile; show it working with one real entry logged.
 

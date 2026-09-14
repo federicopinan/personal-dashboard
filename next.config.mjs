@@ -1,34 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  async rewrites() {
-    // MCP OAuth discovery. Clients construct these `.well-known` URLs themselves
-    // from the issuer (RFC 8414 / 9728), so they MUST live at the origin root.
-    // We serve them from normal API routes via rewrite — robust regardless of
-    // Next's dot-folder routing.
-    return [
-      {
-        source: '/.well-known/oauth-authorization-server',
-        destination: '/api/mcp/oauth/as-metadata',
-      },
-      {
-        // Path-aware variant some clients probe (issuer + resource path).
-        source: '/.well-known/oauth-authorization-server/:path*',
-        destination: '/api/mcp/oauth/as-metadata',
-      },
-      {
-        source: '/.well-known/openid-configuration',
-        destination: '/api/mcp/oauth/as-metadata',
-      },
-      {
-        source: '/.well-known/oauth-protected-resource',
-        destination: '/api/mcp/oauth/protected-resource-metadata',
-      },
-      {
-        source: '/.well-known/oauth-protected-resource/:path*',
-        destination: '/api/mcp/oauth/protected-resource-metadata',
-      },
-    ]
-  },
+  // No rewrites. The MCP/OAuth connector was retired in the
+  // Netlify/localStorage migration: a server cannot persist server writes into a
+  // browser's localStorage, so the connector (which talked to the owner's
+  // Supabase backend) is gone with the backend. The `.well-known/*` discovery
+  // routes the old OAuth server used to advertise are no longer needed.
 }
 
 export default nextConfig

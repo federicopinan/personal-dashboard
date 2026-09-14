@@ -11,7 +11,6 @@ const MentorPage = dynamic(() => import('@/app/mentor/MentorPage'), { ssr: false
 import { initVeeTiles } from '@/components/veeTilesAnim'
 import { useTileHost } from '@/lib/tiles/useTileHost'
 import { withBridge } from '@/lib/tiles/tileBridge'
-import { syncEnabled, syncLoadTiles, syncSaveTile } from '@/lib/sync'
 import type { DashboardChrome } from '@/lib/tiles/dashboardChrome'
 
 /**
@@ -555,10 +554,10 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
     return () => mq.removeEventListener('change', apply)
   }, [])
 
-  // Discover which slots are filled, from two sources (live wins over static):
-  //   1. static files committed to public/tiles/<id>.html (the /tile + Patreon path)
-  //   2. live tiles in Supabase, built from Claude via the MCP connector — these
-  //      override a static file for the same slot and appear without a redeploy.
+  // Discover which slots are filled from the static files committed at
+  // public/tiles/<id>.html (the /tile path). The dashboard is local-only — no
+  // cloud tile source, no override layer; whichever file is in the repo is
+  // the tile that ships.
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -577,11 +576,6 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
       )
       const map: FilledMap = {}
       for (const p of pairs) if (p) map[p[0]] = p[1]
-
-      if (syncEnabled()) {
-        const remote = await syncLoadTiles()
-        for (const id of SLOT_ORDER) if (remote[id]) map[id] = remote[id].html
-      }
 
       if (alive) {
         setFilled(map)

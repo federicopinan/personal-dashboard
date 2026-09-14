@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef } from 'react'
 import { tileStore } from './tileStore'
-import { syncEnabled, syncSave, syncLoad } from '@/lib/sync'
 
 /**
  * useTileHost is the host side of the Vitality bridge, fixed for MANY tiles.
@@ -23,15 +22,18 @@ import { syncEnabled, syncSave, syncLoad } from '@/lib/sync'
  *
  * The map is reset whenever userId changes, so a stale window mapping from a
  * previous user can never route one user's data into another's namespace.
+ *
+ * Persistence is localStorage only (the dashboard is local-only now — see
+ * lib/tiles/tileStore.ts); every save/load round-trips through tileStore.
  */
 export function useTileHost(
   userId: string,
   onActivity?: (info: { tileId: string; type: 'save' | 'load' | 'report'; count: number }) => void,
   /**
-   * Injected handler for a tile's Vitality.report() stream (one numeric life-stream
-   * into Vee). Passed in (not imported) so this hook stays decoupled from the
-   * server action; the create page wires reportStream here. The host only routes
-   * and forwards; the server action validates + RLS-writes.
+   * Injected handler for a tile's Vitality.report() stream (one numeric
+   * life-stream into Vee). Passed in (not imported) so this hook stays
+   * decoupled from any caller-side aggregator; the host only routes and
+   * forwards.
    */
   onReport?: (stream: unknown, tileId: string) => void,
 ) {
@@ -88,9 +90,9 @@ export function useTileHost(
       }
 
       // Cross-tile READ — the host hands a tile another slot's saved data so
-      // tiles can react to each other client-side (e.g. Peak reshaping from the
-      // Vitals recovery) with no /sweep and no connector. Read-only, the user's
-      // OWN data, and whitelisted to the data slots (never 'vee' or internals).
+      // tiles can react to each other client-side (e.g. Peak reshaping from
+      // the Vitals recovery). Read-only, the user's OWN data, and
+      // whitelisted to the data slots (never 'vee' or internals).
       if (msg.type === 'read') {
         const slot = String(msg.slot || '')
         const READABLE = ['train', 'fuel', 'vitals', 'peak', 'finance']
@@ -98,11 +100,7 @@ export function useTileHost(
           src.postMessage({ source: 'vitality-host', type: 'read:error', id: msg.id, reason: 'slot_not_allowed' }, '*')
           return
         }
-        let data = await tileStore.loadData(userId, slot)
-        if (syncEnabled()) {
-          const remote = await syncLoad(slot)
-          if (remote != null) data = remote as typeof data
-        }
+        const data = await tileStore.loadData(userId, slot)
         src.postMessage({ source: 'vitality-host', type: 'read:result', id: msg.id, data }, '*')
         return
       }
@@ -130,22 +128,13 @@ export function useTileHost(
         }
         // ack success so a tile's `await window.Vitality.save(...)` resolves truthfully
         src.postMessage({ source: 'vitality-host', type: 'save:ok', id: msg.id }, '*')
-        // then mirror to the owner's Supabase (if configured) so the same data shows
-        // up on their other devices. Fire-and-forget — never blocks the tile.
-        if (syncEnabled()) void syncSave(tileId, msg.data, new Date().toISOString())
         const count = Array.isArray(msg.data) ? msg.data.length : 0
         activity.current?.({ tileId, type: 'save', count })
         return
       }
 
       if (msg.type === 'load') {
-        // Prefer the cloud copy when sync is on (so a fresh device — the phone —
-        // gets the real data); fall back to this browser's local copy otherwise.
-        let data = await tileStore.loadData(userId, tileId)
-        if (syncEnabled()) {
-          const remote = await syncLoad(tileId)
-          if (remote != null) data = remote as typeof data
-        }
+        const data = await tileStore.loadData(userId, tileId)
         // reply to the exact sender, never a broadcast. targetOrigin stays '*'
         // because a sealed srcDoc tile has an opaque (null) origin; the sender
         // is already verified via the registered e.source, and the payload is
@@ -157,11 +146,11 @@ export function useTileHost(
       }
 
       if (msg.type === 'report') {
-        // One numeric life-stream into Vee. The host only forwards the raw stream
-        // plus the SENDER's tileId (from our own registry, never the iframe's
-        // claim) so the stream's per-tile identity is trustworthy; the injected
-        // handler (the server action) validates it and RLS-writes it under the
-        // session user. Fire-and-forget: a tile never blocks on Vee.
+        // One numeric life-stream into Vee. The host only forwards the raw
+        // stream plus the SENDER's tileId (from our own registry, never the
+        // iframe's claim) so the stream's per-tile identity is trustworthy;
+        // the injected handler does whatever the caller wants with it.
+        // Fire-and-forget: a tile never blocks on Vee.
         report.current?.(msg.stream, tileId)
         activity.current?.({ tileId, type: 'report', count: 1 })
       }

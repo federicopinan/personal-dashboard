@@ -18,10 +18,11 @@ The argument is: $ARGUMENTS
 2. Set the flag in `content/site.ts`: add `detonated: 'black'` (or
    `detonated: 'ambient'`) to the `site` object. The board reads this flag in
    code (see app/app/Dashboard.tsx) — that is what makes the screen go black.
-3. If Supabase is configured (NEXT_PUBLIC_SUPABASE_URL set) the board also loads
-   live tiles from the `tiles` table — clear them too or they resurrect the
-   board: for each slot run the connector's delete_tile, or in the Supabase SQL
-   editor: `delete from public.tiles;`
+3. The dashboard is local-only — every tile's saved data lives in the browser's
+   localStorage, so detonating the tiles leaves the data behind (invisible until
+   the slots come back). To wipe that too, point them at Settings → Datos →
+   "Detonate all tile data". Nothing lives on a server anymore, so there is no
+   cloud copy to clear.
 4. Do NOT touch git history, docs/, tiles-library/, or lib/. Everything they
    built stays recoverable — and YOU keep the full context of this project, so
    when they build again you already know their world.

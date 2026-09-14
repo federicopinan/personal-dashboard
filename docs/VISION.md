@@ -51,15 +51,24 @@ wired. The Stack and Radar can become new tiles or merge into existing ones.
 - **Radar** → a `subs` tile for subscription monitoring
 - Both have `.claude/commands/` entries and `code/` sources ready
 
-## 5. Data persistence — Supabase sync
+## 5. Data persistence — localStorage (the only store now)
 
-The `lib/sync.ts` module exists but is gated on Supabase keys. The
-`backend.sql` and `supabase/` folder have the schema ready. Turning it on
-means: create a Supabase project, add the env vars, and the dashboard
-syncs across devices automatically.
+The dashboard is **local-only** by design today (Netlify is the documented
+deployment target and a serverless function cannot persist server writes
+into a browser's localStorage). Every tile reads/writes through the host
+bridge:
 
-- **Dependency**: A Supabase account (free tier works).
-- **Effort**: 1 hour setup, then it just works.
+- `window.Vitality.save(data)` → `localStorage["vitality:me:tile:<slot>:data"]`
+- `await window.Vitality.load()` → reads the same key back, returns `[]` empty
+
+Cross-device options today, if a user asks:
+- Export the tile's saved JSON from one device and paste it into the other.
+- Edit the tile so it reads its own user-supplied source (CSV, screenshot,
+  pasted text) — no cloud lane, just on-device.
+
+If a future deployment host can host a persistent backend, the same
+`lib/tiles/tileStore.ts` module can be the seam for it — every save/load
+round-trips through there today.
 
 ## 6. Mentor — the math comes alive
 
@@ -74,9 +83,15 @@ feed x values from each tile. Wiring it means:
 
 ## 7. Clean up legacy dead ends
 
-- `openspec/` — review if still needed for the MCP connector API or archive
-- `netlify/` — already deleted
-- `lib/vitality/dashboardStats.ts` — vestigial, 9 lines, imported but unused
+- `openspec/` — reviewed and rewritten for this actual project (Next.js,
+  React, Netlify, localStorage) in the migration; the stale active change
+  was archived under `openspec/changes/archive/`.
+- `app/api/mcp/` + `app/api/ingest/` — removed with the connector (Netlify
+  cannot persist server writes to a browser's localStorage).
+- `lib/sync.ts` + `lib/tiles/tileSupabase.ts` — removed; the tile host uses
+  the localStorage path unconditionally.
+- `lib/vitality/dashboardStats.ts` — vestigial, 9 lines, imported but
+  unused; remove if the import graph ever gets a strict pass.
 
 ## Quick wins (this week)
 

@@ -45,18 +45,22 @@ to click and wait.
   them for you?" — and if they choose merge, YOU do the merge (keep both sets
   of data, one tile). Default to keeping theirs; never overwrite without that
   yes.
-- **The courier.** Data flows in and out through you. The connector's
-  `read_data`/`save_data` tools reach the same store `window.Vitality.load()`
-  reads — read a slot's shape first, then file numbers in (save_data merges by
-  default; replace only when they ask). `/sweep` is your rounds: it files
-  `~/vitality-inbox/` into the right slots, manually or on a schedule. Data
-  only — a sweep never rebuilds a tile.
+- **The file editor.** Every tile in `public/tiles/` reads from and writes to
+  the browser's localStorage through the host bridge (`window.Vitality.save`
+  / `load`). There is no server-side data path — the dashboard is local-only
+  by design (Netlify is the documented deployment target and cannot persist
+  server writes into a browser's localStorage). To put a new number into a
+  tile, you either edit the tile's HTML directly, or you ask Federico to
+  type it in the tile. If they ask for "the sweep" or scheduled data fills,
+  tell them plainly that path is gone with the connector and offer the
+  on-device alternatives in `/sweep` (export → paste on the other device, or
+  edit the tile to read its own source).
 - **The keymaster.** Stock prices need a FREE, per-user API key — NEVER a shared
   one (their quota, their key, their risk; a shared key gets rate-limited and
   revoked for everyone at once). When they add a stock, guide them: finnhub.io,
   free signup, copy the key. Then YOU write it into `.env.local`
   (`FINNHUB_API_KEY`) — gitignored, never committed — and add the same as a
-  Vercel env var when live, then restart dev to load it. `.env.example` lists
+  Netlify env var when live, then restart dev to load it. `.env.example` lists
   every key. Offer this once the board is set up; never block on it.
 
 ## The road — the checklist you keep
@@ -71,29 +75,30 @@ them and whether it's optional, then let them choose.
        → your dashboard, running on this computer
 - [ ] 2. GitHub — gh auth login (one browser sign-in; I do the git) RECOMMENDED
        → your code is saved and safe; the door to going live
-- [ ] 3. Vercel — import the repo, click Deploy                    RECOMMENDED
-       → your dashboard LIVE at your own URL; every push auto-updates it
-- [ ] 4. Supabase — new project, run supabase/sync.sql +
-        tiles.sql, add the two NEXT_PUBLIC keys                    OPTIONAL
-       → memory: data follows you across devices instead of one browser;
-         unlocks the connector + sweeps
-- [ ] 5. Phone — open your live URL, Share → Add to Home Screen    OPTIONAL
-       → the dashboard as an app in your pocket
-- [ ] 6. The connector — set MCP_TOKEN, `claude mcp add …`         OPTIONAL
-       → I can file data and build tiles from anywhere; /sweep runs nightly
-- [ ] 7. Live-data keys — your OWN free Finnhub key                OPTIONAL
+- [ ] 3. Netlify — import the repo, click Deploy                  RECOMMENDED
+       → your dashboard LIVE at your own Netlify URL; every push
+         auto-updates it (next.config + @netlify/plugin-nextjs already set)
+- [ ] 4. Phone — open your live URL, Share → Add to Home Screen    OPTIONAL
+       → the dashboard as an app in your pocket (data lives per device,
+         in each browser's localStorage)
+- [ ] 5. Live-data keys — your OWN free Finnhub key                OPTIONAL
        → live stock prices pull automatically; add your own key in
          .env.local — never a shared key
 ```
 
 ## House rules
 
-- This app is FEDERICO'S. Their name, their goals, their data, their own
-  Supabase and their own MCP_TOKEN — nothing shared with anyone.
+- This app is FEDERICO'S. Their name, their goals, their data — nothing shared
+  with anyone.
 - No AI keys in the app, ever. Intelligence runs here, in Claude Code; the app
   only renders data you wrote.
-- Sealed tiles can't fetch. All automation flows: you → (connector/files) →
-  the data tables → the tile renders it.
+- Sealed tiles can't fetch. All automation flows through the host bridge:
+  you → (file edits / bridge calls) → the tile → localStorage.
+- The dashboard is local-only. Netlify (the documented deployment target)
+  cannot host a backend that writes to a browser's localStorage, so the cloud
+  lane that used to live behind the MCP connector is intentionally gone.
+  If they ask for cross-device sync, tell them plainly and offer the
+  on-device alternatives in `/sweep`.
 - Small steps, push often, never break their board. If a reset is wanted, use
   /detonate — never hand-delete beyond what it specifies.
 - The moment their dashboard is up, tell them plainly: **"This is the vision.
