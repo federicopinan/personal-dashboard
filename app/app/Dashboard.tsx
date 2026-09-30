@@ -333,45 +333,60 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
 function NotesSection() {
   const [notes, setNotes] = useState<{ id: string; text: string; ts: number }[]>([])
   const [input, setInput] = useState('')
+  const [query, setQuery] = useState('')
+  const [editing, setEditing] = useState<string | null>(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    try { const r = localStorage.getItem('vitality:notes'); if (r) setNotes(JSON.parse(r)) } catch {}
+    try { const r = localStorage.getItem('vitality:notes'); if (r) setNotes(JSON.parse(r)) } catch { setError('Could not load saved notes.') }
   }, [])
+
+  const persist = (next: typeof notes) => {
+    try { localStorage.setItem('vitality:notes', JSON.stringify(next)); setNotes(next); setError(''); return true }
+    catch { setError('Could not save notes. Your changes were not saved.'); return false }
+  }
 
   const addNote = () => {
     if (!input.trim()) return
-    const n = { id: crypto.randomUUID(), text: input.trim(), ts: Date.now() }
-    const next = [n, ...notes]
-    setNotes(next)
-    localStorage.setItem('vitality:notes', JSON.stringify(next))
-    setInput('')
+    const next = [{ id: crypto.randomUUID(), text: input.trim(), ts: Date.now() }, ...notes]
+    if (persist(next)) setInput('')
   }
 
   const deleteNote = (id: string) => {
     const next = notes.filter(n => n.id !== id)
-    setNotes(next)
-    localStorage.setItem('vitality:notes', JSON.stringify(next))
+    persist(next)
   }
+
+  const saveEdit = (id: string) => {
+    if (!input.trim()) { setError('A note cannot be empty. The original note is unchanged.'); return }
+    if (persist(notes.map(n => n.id === id ? { ...n, text: input.trim() } : n))) { setEditing(null); setInput('') }
+  }
+  const cancelEdit = () => { setEditing(null); setInput(''); setError('') }
+  const visible = notes.filter(n => n.text.toLowerCase().includes(query.toLowerCase()))
 
   return (
     <div style={{ marginTop: 32 }}>
       <h3 style={{ fontSize: 14, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--muted)', margin: '0 0 12px' }}>Notes</h3>
+      {error && <p role="alert" style={{ color: '#ff8b8b', fontSize: 13 }}>{error}</p>}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') addNote() }}
+          onKeyDown={e => { if (e.key === 'Enter') editing ? saveEdit(editing) : addNote(); else if (e.key === 'Escape' && editing) cancelEdit() }}
           placeholder="Write a note..."
           style={{ flex: 1, padding: '10px 14px', minHeight: 42, borderRadius: 8, border: '1px solid var(--border, #262626)', background: 'var(--bg, #0a0a0a)', color: 'var(--fg, #fff)', fontSize: 16, outline: 'none' }}
         />
-        <button onClick={addNote} style={{ padding: '10px 18px', minHeight: 42, borderRadius: 8, border: 'none', background: 'var(--mint, #6EE7B7)', color: 'var(--mint-ink, #042a1c)', fontWeight: 600, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap' }}>
-          Add
+        <button onClick={() => editing ? saveEdit(editing) : addNote()} style={{ padding: '10px 18px', minHeight: 42, borderRadius: 8, border: 'none', background: 'var(--mint, #6EE7B7)', color: 'var(--mint-ink, #042a1c)', fontWeight: 600, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap' }}>
+          {editing ? 'Save' : 'Add'}
         </button>
+        {editing && <button type="button" onClick={cancelEdit} style={{ padding: '10px 12px', minHeight: 42, borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--fg)', cursor: 'pointer' }}>Cancel edit</button>}
       </div>
+      <input aria-label="Search notes" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search notes..." style={{ width: '100%', marginBottom: 12, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border, #262626)', background: 'var(--bg, #0a0a0a)', color: 'var(--fg, #fff)' }} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {notes.map(n => (
+        {visible.map(n => (
           <div key={n.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 12px', background: 'var(--bg-elevated, #121212)', borderRadius: 8, border: '1px solid var(--border, #1c1c1c)' }}>
-            <span style={{ flex: 1, fontSize: 14, lineHeight: 1.5, color: 'var(--fg)' }}>{n.text}</span>
+            <div style={{ flex: 1 }}><small style={{ color: 'var(--muted)' }}>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(n.ts)}</small><div style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--fg)' }}>{n.text}</div></div>
+            <button onClick={() => { setEditing(n.id); setInput(n.text) }} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>Edit</button>
             <button onClick={() => deleteNote(n.id)} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 2, fontSize: 16, lineHeight: 1 }} title="Delete">×</button>
           </div>
         ))}
@@ -384,26 +399,33 @@ function NotesSection() {
 function TasksSection() {
   const [tasks, setTasks] = useState<{ id: string; text: string; done: boolean }[]>([])
   const [input, setInput] = useState('')
+  const [day, setDay] = useState(() => localDateKey(new Date()))
+  const [history, setHistory] = useState<string[]>([])
+  const [error, setError] = useState('')
 
   useEffect(() => {
     try {
-      // load today's tasks
-      const today = new Date().toISOString().slice(0, 10)
-      const r = localStorage.getItem(`vitality:tasks:${today}`)
-      if (r) setTasks(JSON.parse(r))
-    } catch {}
+      const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i) || '').filter(k => /^vitality:tasks:\d{4}-\d{2}-\d{2}$/.test(k)).map(k => k.slice('vitality:tasks:'.length))
+      setHistory(keys.sort().reverse())
+    } catch { setError('Could not read task history.') }
   }, [])
 
-  const save = useCallback((next: typeof tasks) => {
-    setTasks(next)
-    const today = new Date().toISOString().slice(0, 10)
-    localStorage.setItem(`vitality:tasks:${today}`, JSON.stringify(next))
-  }, [])
+  useEffect(() => {
+    try { const r = localStorage.getItem(`vitality:tasks:${day}`); setTasks(r ? JSON.parse(r) : []); setError('') }
+    catch { setTasks([]); setError('Could not load tasks for this date.') }
+  }, [day])
+
+  const save = useCallback((next: typeof tasks, target = day) => {
+    try {
+      localStorage.setItem(`vitality:tasks:${target}`, JSON.stringify(next))
+      setTasks(next); setHistory(prev => Array.from(new Set([target, ...prev])).sort().reverse()); setError('')
+      return true
+    } catch { setError('Could not save tasks. Your changes were not saved.'); return false }
+  }, [day])
 
   const addTask = () => {
     if (!input.trim()) return
-    save([...tasks, { id: crypto.randomUUID(), text: input.trim(), done: false }])
-    setInput('')
+    if (save([...tasks, { id: crypto.randomUUID(), text: input.trim(), done: false }])) setInput('')
   }
 
   const toggle = (id: string) => {
@@ -416,7 +438,10 @@ function TasksSection() {
 
   return (
     <div style={{ marginTop: 32 }}>
-      <h3 style={{ fontSize: 14, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--muted)', margin: '0 0 12px' }}>Today's Tasks</h3>
+      <h3 style={{ fontSize: 14, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--muted)', margin: '0 0 12px' }}>Tasks by local date</h3>
+      {error && <p role="alert" style={{ color: '#ff8b8b', fontSize: 13 }}>{error}</p>}
+      <label style={{ display: 'block', color: 'var(--muted)', fontSize: 12, marginBottom: 10 }}>Selected date (local): <input type="date" value={day} onChange={e => setDay(e.target.value)} /></label>
+      <button type="button" onClick={() => { const prev = new Date(`${day}T12:00:00`); prev.setDate(prev.getDate() - 1); const source = localDateKey(prev); try { const prior = JSON.parse(localStorage.getItem(`vitality:tasks:${source}`) || '[]'); const targetIds = new Set(tasks.map(t => t.id)); const carry = prior.filter((t: { id: string; done: boolean }) => !t.done && !targetIds.has(t.id)); if (carry.length) save([...tasks, ...carry.map((t: { id: string; text: string }) => ({ id: t.id, text: t.text, done: false }))]); else setError('No new incomplete tasks to carry forward.') } catch { setError('Could not read the previous date’s tasks.') } }} style={{ marginBottom: 12, padding: '7px 12px', borderRadius: 8, background: 'transparent', color: 'var(--fg)', border: '1px solid var(--border)' }}>Carry incomplete tasks from previous date</button>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <input
           value={input}
@@ -437,10 +462,15 @@ function TasksSection() {
             <button onClick={() => deleteTask(t.id)} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 2, fontSize: 16, lineHeight: 1 }} title="Delete">×</button>
           </div>
         ))}
-        {tasks.length === 0 && <p style={{ color: 'var(--muted)', fontSize: 13, margin: 0 }}>No tasks for today.</p>}
+        {tasks.length === 0 && <p style={{ color: 'var(--muted)', fontSize: 13, margin: 0 }}>No tasks for this date.</p>}
       </div>
+      {history.length > 1 && <div aria-label="Browse saved task dates" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}><span style={{ color: 'var(--muted)', fontSize: 12 }}>Saved dates:</span>{history.map(date => <button type="button" key={date} onClick={() => setDay(date)} aria-pressed={day === date} style={{ color: 'var(--fg)', background: day === date ? 'rgba(255,255,255,.12)' : 'transparent', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 7px', cursor: 'pointer' }}>{date}</button>)}</div>}
     </div>
   )
+}
+
+function localDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 export default function Dashboard({ firstName, userId }: DashboardProps) {
