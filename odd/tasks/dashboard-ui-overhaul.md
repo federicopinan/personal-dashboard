@@ -90,7 +90,13 @@ Implementation route: **delegated direct**, one bounded writer per task, execute
 - [ ] Keep the carry-forward action and the saved-dates history, and make the control keyboard and screen-reader operable.
 - Route: delegated direct. Trigger: new module plus the tasks section it replaces.
 - Checks: `pnpm build`.
-- Status/evidence/commit: pending.
+- Status/evidence/commit: **done; uncommitted at time of writing**. The bare native `<input type="date">` is replaced by a four-part control in `dashboard.module.css`: previous-day stepper, a serif-italic formatted readout doubling as a `YYYY-MM-DD` text entry, next-day stepper, and a calendar button that calls `showPicker()` on a visually-hidden native input. The saved-dates chips are kept, restyled as pills, with `aria-pressed` marking the selected day. Styles went into `dashboard.module.css` rather than `globals.css` because the module is already imported by `Dashboard.tsx`, the control has exactly one consumer, and the real focus-ring convention lives there; `globals.css` holds primitives shared across pages.
+- **Storage contract guaranteed structurally, not by convention.** `setDay` is reachable from exactly one function, `commitDay`, which accepts only values `normaliseDayKey` validated and that `localDateKey` itself produced. All four input paths (both steppers via `shiftDayKey`, the text field, the native picker, the chips) route through it. Parent grep confirms `toISOString` appears nowhere in `TasksSection` and the `vitality:tasks:YYYY-MM-DD` key pattern is untouched. `dayFromKey` builds a **local** `Date` anchored at 12:00, which makes stepping DST-safe and rejects impossible dates like `2026-02-31` (which would otherwise roll into March) and the `new Date(50, ...)` → 1950 trap. The writer verified the helpers across 8 timezones including UTC+14, UTC−11 and a 30-minute DST zone: 34 assertions, 120 round-trips, and a ~15.7M-hour sweep confirming `normaliseDayKey` is the identity function on every `localDateKey` output.
+- Accessibility: real `<label htmlFor>` via `useId()`; Enter commits, Escape reverts the draft while keeping the caret (a ref guards the blur that would otherwise re-commit abandoned text); invalid input reverts and shows `role="alert"` wired through `aria-invalid` and `aria-describedby`; steppers announce their destination in their `aria-label`; a `role="status"` region announces the selected day; `:focus-within` tints the whole card so mouse focus is visible too, since `:focus-visible` alone never fires for mouse. The adjacent note/task inputs set inline `outline:'none'` with no replacement; that a11y gap was identified and deliberately left alone as out of scope.
+- Deliberate decision: stepping **past today is allowed**. A task list is for planning, clamping would be a regression versus the native input it replaces, and a hard ceiling would break the carry-forward affordance, which is inherently "prepare the next day". One conditional plus a `disabled` attribute if a ceiling is ever wanted.
+- Verification: `pnpm build` passed (writer and parent spot check): `✓ Compiled successfully`, `Generating static pages (10/10)`. Dev server returned HTTP 200 and was stopped. Risk assessed medium, `review_due: false` (`under_budget`), so no native review. **Painted appearance, real `showPicker()` behaviour, and screen-reader announcement order were not verified — no browser attached.**
+- Proposed for UX-6, not applied: shorten `Carry incomplete tasks from previous date` to `Carry forward` with a descriptive `title`/`aria-label`; the section heading already says "Tasks by local date", and the long sentence is the mobile wrapping culprit.
+- Correction to the earlier map: the `.field`/`.label`/`.input` primitives are at `globals.css:363-402`, not `341-378`.
 
 ### UX-5 — Notes and Tasks get their own routes
 - [ ] Extract `NotesSection` and `TasksSection` into reusable modules without changing the storage keys.
@@ -112,5 +118,5 @@ Implementation route: **delegated direct**, one bounded writer per task, execute
 
 ## Progress
 - Branch: `master` (single-branch layout).
-- Completed: read-only exploration and mapping of the UI surface. UX-1 committed (`3135c05`), UX-2 committed (`f802b8f`). UX-3 verified, ready to commit.
-- Current next step: UX-4, house-designed day selector.
+- Completed: read-only exploration and mapping of the UI surface. UX-1 committed (`3135c05`), UX-2 committed (`f802b8f`), UX-3 committed (`9c9988a`). UX-4 verified, ready to commit.
+- Current next step: UX-5, Notes and Tasks get their own routes.
