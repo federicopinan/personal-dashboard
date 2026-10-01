@@ -603,19 +603,27 @@
    focusable surface in the app uses. */
 .navRow {
   display: flex;
-  flex-wrap: wrap;
+  /* Two cards, always side by side. There is no third card and no reason for
+     this row to ever wrap, so the wrap that used to be here — which stacked
+     them one per row on a phone — is gone rather than tuned. */
+  flex-wrap: nowrap;
   gap: var(--space-3);
 }
 
 .navCard {
   position: relative;
-  /* 240px is the point where two cards no longer fit the 640px column; below
-     it they wrap to one per row without a media query. */
-  flex: 1 1 240px;
+  /* 1 1 0 with min-width 0 is what actually keeps them side by side. A nonzero
+     basis made each card ask for 240px, and once their sum exceeded a phone's
+     content width flex-wrap stacked them. Sizing from zero and allowing the
+     card to shrink means the row is always exactly two cards wide at every
+     viewport; min-width 0 is what lets the content shrink instead of forcing
+     the card wider than its share. */
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-4) var(--space-4);
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -649,9 +657,14 @@
 
 /* Instrument Serif italic, like every other readout in the app. The line is
    reserved because the count is read after mount: an empty line that holds its
-   height is honest, a "0" that is really "not read yet" is not. */
+   height is honest, a "0" that is really "not read yet" is not.
+   The right padding reserves the corner the arrow occupies, and overflow-wrap
+   lets "12 open today" break across two lines inside a phone-width card rather
+   than push the card wider or collide with the arrow. */
 .navCount {
   min-height: 1.4em;
+  padding-right: 1.5em;
+  overflow-wrap: anywhere;
   font-family: var(--font-serif), 'Times New Roman', Georgia, serif;
   font-style: italic;
   font-size: var(--text-lg);
@@ -671,6 +684,54 @@
 .navCard:hover .navArrow {
   color: var(--mint);
   transform: translateX(2px);
+}
+
+/* The hand-off to the deep work app. Deliberately a different weight from the
+   two route cards: those are places you live inside this dashboard, this one
+   leaves for somewhere else, and the same card shape would make all three read
+   as the same kind of destination. Ghost styling keeps it present without
+   competing with the board above it. */
+.deepWork {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--fg);
+  text-decoration: none;
+  transition:
+    border-color var(--duration) var(--ease),
+    background var(--duration) var(--ease);
+}
+
+.deepWork:hover {
+  border-color: var(--mint);
+  background: var(--card);
+}
+
+.deepWork:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 2px;
+}
+
+.deepWorkName {
+  font-family: var(--font-serif), 'Times New Roman', Georgia, serif;
+  font-style: italic;
+  font-size: var(--text-base);
+  color: var(--muted-strong);
+  transition: color var(--duration) var(--ease);
+}
+
+.deepWork:hover .deepWorkName {
+  color: var(--mint);
+}
+
+.deepWork .navArrow {
+  position: static;
+  margin-left: auto;
 }
 
 /* Visually hidden, still announced. Carries the selected day after a step so

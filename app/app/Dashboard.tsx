@@ -359,18 +359,30 @@ function RouteLinks() {
   }, [])
 
   return (
-    <div className={styles.navRow}>
-      <Link href="/notes" className={styles.navCard}>
-        <span className={styles.navKicker}>Notes</span>
-        <span className={styles.navCount}>{counts.notes === null ? '' : `${counts.notes} saved`}</span>
-        <span aria-hidden className={styles.navArrow}>→</span>
-      </Link>
-      <Link href="/tasks" className={styles.navCard}>
-        <span className={styles.navKicker}>Tasks</span>
-        <span className={styles.navCount}>{counts.open === null ? '' : `${counts.open} open today`}</span>
-        <span aria-hidden className={styles.navArrow}>→</span>
-      </Link>
-    </div>
+    <>
+      <div className={styles.navRow}>
+        <Link href="/notes" className={styles.navCard}>
+          <span className={styles.navKicker}>Notes</span>
+          <span className={styles.navCount}>{counts.notes === null ? '' : `${counts.notes} saved`}</span>
+          <span aria-hidden className={styles.navArrow}>→</span>
+        </Link>
+        <Link href="/tasks" className={styles.navCard}>
+          <span className={styles.navKicker}>Tasks</span>
+          <span className={styles.navCount}>{counts.open === null ? '' : `${counts.open} open today`}</span>
+          <span aria-hidden className={styles.navArrow}>→</span>
+        </Link>
+      </div>
+      {/* Deep work lives on its own app, so this leaves the dashboard entirely
+          rather than opening a route here. It is its own row, not a third card
+          in .navRow: that row is a fixed two-up and a third would break the
+          pairing the two routes are meant to have. target/rel are the correct
+          values for a deliberate cross-origin hand-off to a tool the user owns. */}
+      <a className={styles.deepWork} href="https://locked-in.ai.studio" target="_blank" rel="noopener noreferrer">
+        <span className={styles.navKicker}>Deep work</span>
+        <span className={styles.deepWorkName}>locked-in.ai.studio</span>
+        <span aria-hidden className={styles.navArrow}>↗</span>
+      </a>
+    </>
   )
 }
 
