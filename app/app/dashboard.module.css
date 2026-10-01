@@ -883,6 +883,84 @@
   outline-offset: 2px;
 }
 
+/* ───────── Notes / tasks route links ─────────
+   The board's way in to /notes and /tasks. Two cards under the grid, each a
+   next/link, each carrying a one-line summary of what is actually in the
+   browser. Hover and focus live here rather than inline because neither has an
+   inline equivalent, and the 2px mint ring is the same one every other
+   focusable surface in the app uses. */
+.navRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.navCard {
+  position: relative;
+  /* 240px is the point where two cards no longer fit the 640px column; below
+     it they wrap to one per row without a media query. */
+  flex: 1 1 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-4) var(--space-5);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--fg);
+  text-decoration: none;
+  transition:
+    border-color var(--duration) var(--ease),
+    background var(--duration) var(--ease),
+    transform var(--duration) var(--ease);
+}
+
+.navCard:hover {
+  border-color: var(--border-strong);
+  background: var(--card-elevated);
+  transform: translateY(-1px);
+}
+
+.navCard:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 2px;
+}
+
+.navKicker {
+  font-family: var(--font-mono), ui-monospace, 'SFMono-Regular', monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Instrument Serif italic, like every other readout in the app. The line is
+   reserved because the count is read after mount: an empty line that holds its
+   height is honest, a "0" that is really "not read yet" is not. */
+.navCount {
+  min-height: 1.4em;
+  font-family: var(--font-serif), 'Times New Roman', Georgia, serif;
+  font-style: italic;
+  font-size: var(--text-lg);
+  color: var(--fg);
+}
+
+.navArrow {
+  position: absolute;
+  right: var(--space-5);
+  bottom: var(--space-4);
+  color: var(--muted);
+  transition:
+    color var(--duration) var(--ease),
+    transform var(--duration) var(--ease);
+}
+
+.navCard:hover .navArrow {
+  color: var(--mint);
+  transform: translateX(2px);
+}
+
 /* Visually hidden, still announced. Carries the selected day after a step so
    the change is not silent for screen reader users. */
 .srOnly {
