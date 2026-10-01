@@ -68,13 +68,37 @@
 }
 
 html, body {
-  height: 100%;
+  /* min-height, not height: the document must stay free to grow past the
+     viewport so it can actually scroll, while the root still spans one full
+     screen so there is never a gap under a short page. The fixed WelcomeBackdrop
+     layers resolve against the viewport, not this box, so they keep covering
+     the screen either way. */
+  min-height: 100%;
   /* Rubber-band / overscroll past the top of any page must show the app's
      near-black, never a pure-black band. Tint the root the editorial
      atmosphere's darkest stop (#04060a) so the reveal is seamless, and damp the
      bounce so it barely shows at all. body keeps var(--bg) below. */
   background: #04060a;
   overscroll-behavior-y: none;
+  /* Breathing room above every scroll target, so an anchor jump or a restored
+     scroll position lands in the same top gutter .page already pads itself with
+     instead of flush against the viewport edge. Mirrors .page's desktop
+     padding-top. The dashboard header is not sticky or fixed, so this is a
+     margin of comfort, not a header-clearance offset. */
+  scroll-padding-top: calc(var(--space-10) + env(safe-area-inset-top));
+}
+
+/* Eased document scrolling, on the same curve as every other transition in the
+   app so a fragment link or restored position arrives with the motion of the
+   rest of the UI. Gated on no-preference rather than reduce: under
+   prefers-reduced-motion the property is simply never set, so scroll-behavior
+   stays `auto` and the jump is genuinely instant, not merely faster. It also
+   cannot override the reduced-motion blocks below — they declare display and
+   animation, never scroll-behavior. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 body {

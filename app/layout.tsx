@@ -52,15 +52,13 @@ export const metadata: Metadata = {
 }
 
 // Mobile scaling + brand-dark browser/status-bar chrome. viewportFit:'cover'
-// lets the standalone app paint under the iPhone notch / home indicator;
-// userScalable:false stops double-tap-zoom fighting tap targets in the dense
-// logger UI.
+// lets the standalone app paint under the iPhone notch / home indicator.
+// Zoom is left enabled (no userScalable:false / maximumScale:1): pinch-to-zoom
+// is an accessibility affordance and clamping it makes small text unreadable.
 export const viewport: Viewport = {
   themeColor: '#04060a',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: 'cover',
 }
 
