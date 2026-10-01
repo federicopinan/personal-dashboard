@@ -85,27 +85,15 @@ function RollPct({ value, color }: { value: number; color: string }) {
     return () => cancelAnimationFrame(raf)
   }, [value])
   return (
+    // The box, the size and the offset live in components/veeTiles.css
+    // (.rollPct): the tile is a fluid cell now, so a fixed 46px and a fixed
+    // top:52 were only ever right at the 300px the mockup drew. Only the two
+    // values that come from the goal stay inline.
     <span
+      className="rollPct"
       style={{
-        // top-centre with generous margin — clear of the index row above and
-        // the art + caption below, so the number is never blocked.
-        position: 'absolute',
-        top: 52,
-        left: 0,
-        right: 0,
-        zIndex: 5,
-        display: 'flex',
-        justifyContent: 'center',
-        pointerEvents: 'none',
-        fontFamily: 'ui-monospace, Menlo, monospace',
-        fontSize: 46,
-        fontWeight: 300,
-        letterSpacing: '.02em',
-        fontVariantNumeric: 'tabular-nums',
         color,
-        opacity: 0.9,
         textShadow: `0 0 26px ${color}59`,
-        transition: 'color .8s ease, text-shadow .8s ease',
       }}
     >
       {shown}%
@@ -427,7 +415,10 @@ function EmptyCanvas({ onBack }: { onBack: () => void }) {
           color: '#04140d',
           border: 'none',
           borderRadius: 999,
-          padding: '13px 28px',
+          padding: '0 28px',
+          minHeight: 'var(--touch)',
+          display: 'inline-flex',
+          alignItems: 'center',
           fontWeight: 600,
           fontSize: 15,
           cursor: 'pointer',
@@ -483,7 +474,10 @@ function VisionEmptyState({ onNewTile }: { onNewTile: () => void }) {
           color: '#04140d',
           border: 'none',
           borderRadius: 999,
-          padding: '12px 26px',
+          padding: '0 26px',
+          minHeight: 'var(--touch)',
+          display: 'inline-flex',
+          alignItems: 'center',
           fontWeight: 600,
           fontSize: 15,
           cursor: 'pointer',
@@ -749,7 +743,10 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                       border: grouped ? 'none' : `1px solid ${on ? `${gA}88` : `${gA}44`}`,
                       boxShadow: grouped && on ? `inset 0 0 0 1px ${gA}66` : 'none',
                       borderRadius: 999,
-                      padding: '7px 15px',
+                      padding: '0 15px',
+                      minHeight: 'var(--touch)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
                       cursor: 'pointer',
                       transition: 'color .5s ease, background .5s ease, border-color .5s ease',
                       whiteSpace: 'nowrap',
@@ -815,7 +812,10 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                 color: editing ? 'var(--mint-ink, #042a1c)' : 'var(--muted)',
                 border: editing ? 'none' : '1px solid var(--border)',
                 borderRadius: 999,
-                padding: '5px 14px',
+                padding: '0 16px',
+                minHeight: 'var(--touch)',
+                display: 'inline-flex',
+                alignItems: 'center',
                 fontWeight: 600,
                 fontSize: 12,
                 cursor: 'pointer',

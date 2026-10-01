@@ -33,6 +33,12 @@
   --space-12: 3rem;
   --space-16: 4rem;
 
+  /* Targets — the smallest axis a primary control is allowed to be.
+     A thumb and a stylus both need roughly this, so it is a named value rather
+     than a 44px repeated at every call site. Secondary controls (chips, links
+     inside prose) may go smaller; a button that performs an action may not. */
+  --touch: 44px;
+
   /* Radius */
   --radius-sm: 6px;
   --radius-md: 8px;

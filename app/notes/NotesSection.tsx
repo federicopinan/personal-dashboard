@@ -51,26 +51,30 @@ export default function NotesSection() {
     <div style={{ marginTop: 32 }}>
       <h3 style={{ fontSize: 14, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--muted)', margin: '0 0 12px' }}>Notes</h3>
       {error && <p role="alert" style={{ color: '#ff8b8b', fontSize: 13 }}>{error}</p>}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+      {/* flexWrap + minWidth:0 on the input is what makes this row survive
+          320px. Editing adds a third button, so at a phone width the input and
+          the actions genuinely cannot share a line: the buttons wrap to a second
+          line instead of pushing the composer past the edge of the screen. */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') editing ? saveEdit(editing) : addNote(); else if (e.key === 'Escape' && editing) cancelEdit() }}
           placeholder="Write a note..."
-          style={{ flex: 1, padding: '10px 14px', minHeight: 42, borderRadius: 8, border: '1px solid var(--border, #262626)', background: 'var(--bg, #0a0a0a)', color: 'var(--fg, #fff)', fontSize: 16, outline: 'none' }}
+          style={{ flex: '1 1 180px', minWidth: 0, padding: '10px 14px', minHeight: 'var(--touch)', borderRadius: 8, border: '1px solid var(--border, #262626)', background: 'var(--bg, #0a0a0a)', color: 'var(--fg, #fff)', fontSize: 16, outline: 'none' }}
         />
-        <button onClick={() => editing ? saveEdit(editing) : addNote()} style={{ padding: '10px 18px', minHeight: 42, borderRadius: 8, border: 'none', background: 'var(--mint, #6EE7B7)', color: 'var(--mint-ink, #042a1c)', fontWeight: 600, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap' }}>
+        <button onClick={() => editing ? saveEdit(editing) : addNote()} style={{ padding: '0 18px', minHeight: 'var(--touch)', borderRadius: 8, border: 'none', background: 'var(--mint, #6EE7B7)', color: 'var(--mint-ink, #042a1c)', fontWeight: 600, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap' }}>
           {editing ? 'Save' : 'Add'}
         </button>
-        {editing && <button type="button" onClick={cancelEdit} style={{ padding: '10px 12px', minHeight: 42, borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--fg)', cursor: 'pointer' }}>Cancel edit</button>}
+        {editing && <button type="button" onClick={cancelEdit} style={{ padding: '0 14px', minHeight: 'var(--touch)', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--fg)', cursor: 'pointer', whiteSpace: 'nowrap' }}>Cancel edit</button>}
       </div>
-      <input aria-label="Search notes" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search notes..." style={{ width: '100%', marginBottom: 12, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border, #262626)', background: 'var(--bg, #0a0a0a)', color: 'var(--fg, #fff)' }} />
+      <input aria-label="Search notes" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search notes..." style={{ width: '100%', marginBottom: 12, padding: '0 12px', minHeight: 'var(--touch)', borderRadius: 8, border: '1px solid var(--border, #262626)', background: 'var(--bg, #0a0a0a)', color: 'var(--fg, #fff)', fontSize: 16 }} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {visible.map(n => (
-          <div key={n.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 12px', background: 'var(--bg-elevated, #121212)', borderRadius: 8, border: '1px solid var(--border, #1c1c1c)' }}>
-            <div style={{ flex: 1 }}><small style={{ color: 'var(--muted)' }}>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(n.ts)}</small><div style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--fg)' }}>{n.text}</div></div>
-            <button onClick={() => { setEditing(n.id); setInput(n.text) }} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>Edit</button>
-            <button onClick={() => deleteNote(n.id)} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 2, fontSize: 16, lineHeight: 1 }} title="Delete">×</button>
+          <div key={n.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 2, padding: '4px 4px 4px 12px', background: 'var(--bg-elevated, #121212)', borderRadius: 8, border: '1px solid var(--border, #1c1c1c)' }}>
+            <div style={{ flex: 1, minWidth: 0 }}><small style={{ color: 'var(--muted)' }}>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(n.ts)}</small><div style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--fg)' }}>{n.text}</div></div>
+            <button onClick={() => { setEditing(n.id); setInput(n.text) }} style={{ flex: '0 0 auto', display: 'grid', placeItems: 'center', minWidth: 'var(--touch)', minHeight: 'var(--touch)', padding: '0 8px', background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 13 }} aria-label={`Edit note: ${n.text}`}>Edit</button>
+            <button onClick={() => deleteNote(n.id)} style={{ flex: '0 0 auto', display: 'grid', placeItems: 'center', width: 'var(--touch)', height: 'var(--touch)', background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }} title="Delete" aria-label={`Delete note: ${n.text}`}>×</button>
           </div>
         ))}
         {!loaded && <p role="status" style={{ color: 'var(--muted)', fontSize: 13, margin: 0 }}>Loading notes...</p>}

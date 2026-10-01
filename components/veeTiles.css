@@ -22,7 +22,18 @@
    fill the first two rows and every further tile adds a row. Nothing here is
    absolutely placed and nothing scrolls sideways — the browser packs the cells
    and the JSX only lists them. Vee (the mentor) is deliberately NOT a cell: it
-   stays a full-width hero above the grid, because its art is drawn for it. */
+   stays a full-width hero above the grid, because its art is drawn for it.
+
+   ── the responsive contract ──
+   Two media queries, and only two: 760px (three columns become two) and 480px
+   (two become one). That is the whole board. Everything drawn INSIDE a tile is
+   sized in cqw — one hundredth of the cell's own width — so the chrome tracks
+   the column it landed in rather than the viewport, and the 3-up, 2-up and 1-up
+   buckets need no per-breakpoint type table to stay in sync. The mockup's
+   numbers were drawn for a 300px cell, so each length is written as
+   clamp(<floor>, <300px value>cqw, <ceiling>); a browser without container
+   query support, or a cell that somehow measured zero, lands on the floor
+   instead of collapsing. */
 .veeTiles .xGrid{
   display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));
@@ -33,41 +44,41 @@
    as its column and keeps its proportions at any width; its .tile just fills
    the cell, which matters because every child of a .tile is absolutely
    positioned. align-self:start sizes the row BY that ratio instead of letting
-   a definite-height box stretch. */
-.veeTiles .xCell,.veeTiles .xAdd{aspect-ratio:15/17;align-self:start}
+   a definite-height box stretch. container-type puts a query container on the
+   cell, so the tile chrome below can ask how wide this cell actually got.
+   Containment is safe here by construction: the cell has a definite inline size
+   from its grid track and a definite block size from the ratio, it contains no
+   fixed-position descendant, and it is already a stacking context. */
+.veeTiles .xCell{aspect-ratio:15/17;align-self:start;container-type:inline-size}
+.veeTiles .xAdd{aspect-ratio:15/17;align-self:start}
 .veeTiles .xCell>.tile{width:100%;height:100%}
-/* the + tile: the same cell, transparent — build the next input */
+/* the + tile: the same cell, transparent — build the next input. It is a grid
+   child, not a .xCell, so it has no query container of its own; its radius is a
+   plain 20px for that reason. */
 .veeTiles .xAdd{border:1px dashed rgba(110,231,183,.35);background:transparent;
   border-radius:20px;color:var(--mint);font-family:inherit;font-size:46px;font-weight:300;
   cursor:pointer;transition:border-color .2s var(--vease),background .2s var(--vease)}
 .veeTiles .xAdd:hover{border-color:var(--mint);background:rgba(110,231,183,.04)}
 
-/* Narrow: three columns hold down to 760px (a ~225px tile, which the tightened
-   type below still fits), then two, then a single full-width tile on a phone —
-   a 2-up cell there would be ~150px, too small for the 22px serif label. The
-   offsets are the 300px-tile numbers, pulled in as the cell narrows. */
+/* Narrow: three columns hold while a cell stays wide enough to draw its own
+   label in. Above 760 the shell is the binding constraint (a 3-up cell is
+   ~366px at 1180), and below 760 a 2-up cell runs ~219-467px — both inside
+   what the cqw chrome above handles on its own. Below 480 a 2-up cell would be
+   ~150px, which is too small for the serif label at any legible size, so the
+   last stop is one full-width tile: the narrowest board, and the biggest cell
+   on it. */
 @media (max-width:760px){
   .veeTiles .xGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-  .veeTiles .tile{border-radius:16px;}
-  .veeTiles .index{top:12px;left:14px;font-size:9px;}
-  .veeTiles .glyph{top:10px;right:12px;width:18px;height:18px;}
-  .veeTiles .label{left:14px;bottom:12px;font-size:18px;}
-  .veeTiles .stat{left:14px;bottom:36px;font-size:14px;}
-  .veeTiles .cap{left:14px;bottom:12px;}
-  .veeTiles .arrow{right:12px;bottom:12px;}
-  .veeTiles .tile.live .cap{flex-direction:column;align-items:flex-start;gap:2px;}
 }
 @media (max-width:480px){
   .veeTiles .xGrid{grid-template-columns:minmax(0,1fr);gap:10px}
-  .veeTiles .label{font-size:16px;}
-  .veeTiles .stat{font-size:13px;}
 }
 
 /* Tiles read as translucent glass that sits IN the world: a see-through tinted
    gradient (~50% opacity) so the aurora, mountains and drifting particles read
    softly through them, with a soft top highlight + drop shadow. Kept dark enough
    that the orbs/graphs/text stay legible. */
-.veeTiles .tile{position:relative;overflow:hidden;border-radius:20px;border:1px solid rgba(167,243,208,.10);
+.veeTiles .tile{position:relative;overflow:hidden;border-radius:clamp(15px,6.67cqw,20px);border:1px solid rgba(167,243,208,.10);
   background:linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 22px 50px -30px rgba(0,0,0,.75);
   isolation:isolate;transition:border-color .4s var(--vease), background .4s var(--vease), box-shadow .4s var(--vease);
@@ -90,20 +101,42 @@
    the designs read as "barely there". */
 .veeTiles .tile:not(.vee):has(.wmArt)::after{
   background:linear-gradient(to top, rgba(4,7,6,.5) 0%, rgba(4,7,6,.12) 22%, transparent 44%)}
-.veeTiles .index{position:absolute;top:15px;left:20px;z-index:6;font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:rgba(255,255,255,.38)}
-.veeTiles .glyph{position:absolute;top:13px;right:16px;z-index:6;width:20px;height:20px;color:var(--mint);opacity:.4}
+/* Every corner, caption and offset below is the mockup's 300px-cell number
+   converted to cqw and clamped, so the tile reads identically at 366px (3-up
+   desktop), at ~220px (2-up on a small phone) and at ~448px (1-up on a tablet)
+   without one breakpoint of type per column bucket.
+   The mentor hero is a .tile but NOT inside a cell, so for it cqw has no
+   container to ask and falls back to the small viewport — which is why every
+   clamp here is capped at the mockup's own desktop number: the hero lands on
+   exactly the values it has always had, at every viewport, and the grid tiles
+   are the only thing that moves. */
+.veeTiles .index{position:absolute;top:clamp(10px,5cqw,15px);left:clamp(13px,6.67cqw,20px);z-index:6;font-family:var(--mono);font-size:clamp(9px,3.33cqw,10px);letter-spacing:.12em;color:rgba(255,255,255,.38)}
+.veeTiles .glyph{position:absolute;top:clamp(10px,4.33cqw,13px);right:clamp(11px,5.33cqw,16px);z-index:6;width:clamp(17px,6.67cqw,20px);height:clamp(17px,6.67cqw,20px);color:var(--mint);opacity:.4}
 .veeTiles .glyph svg{width:100%;height:100%;display:block}
-.veeTiles .label{position:absolute;left:20px;bottom:16px;z-index:6;font-family:var(--serif);font-style:italic;font-size:22px;color:var(--vfg)}
-.veeTiles .arrow{position:absolute;right:18px;bottom:17px;z-index:6;color:var(--vfg);opacity:.4;font-size:14px}
+.veeTiles .label{position:absolute;left:clamp(13px,6.67cqw,20px);bottom:clamp(10px,5.33cqw,16px);z-index:6;font-family:var(--serif);font-style:italic;font-size:clamp(15px,7.33cqw,22px);color:var(--vfg)}
+.veeTiles .arrow{position:absolute;right:clamp(11px,6cqw,18px);bottom:clamp(10px,5.67cqw,17px);z-index:6;color:var(--vfg);opacity:.4;font-size:clamp(12px,4.67cqw,14px)}
 /* live stat — one glanceable metric per tile */
-.veeTiles .stat{position:absolute;left:20px;bottom:46px;z-index:6;font-family:var(--mono);font-size:16px;font-weight:500;letter-spacing:.01em;color:var(--mint)}
-.veeTiles .stat i{font-style:normal;font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--vmuted);margin-left:4px}
+.veeTiles .stat{position:absolute;left:clamp(13px,6.67cqw,20px);bottom:clamp(30px,15.33cqw,46px);z-index:6;font-family:var(--mono);font-size:clamp(12px,5.33cqw,16px);font-weight:500;letter-spacing:.01em;color:var(--mint)}
+.veeTiles .stat i{font-style:normal;font-size:clamp(8px,3.33cqw,10px);font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--vmuted);margin-left:clamp(3px,1.33cqw,4px)}
 .veeTiles .fin .stat{color:var(--gold)}
 /* title + metric stack, bottom-left. Default: metric sits BELOW the title. */
-.veeTiles .cap{position:absolute;left:20px;bottom:16px;z-index:6;display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.veeTiles .cap{position:absolute;left:clamp(13px,6.67cqw,20px);bottom:clamp(10px,5.33cqw,16px);z-index:6;display:flex;flex-direction:column;gap:clamp(2px,1cqw,3px);align-items:flex-start}
 .veeTiles .cap .label,.veeTiles .cap .stat{position:static}
 /* graph tiles: metric sits just to the right of the title, on the same baseline */
-.veeTiles .tile.live .cap{flex-direction:row;align-items:baseline;gap:12px}
+.veeTiles .tile.live .cap{flex-direction:row;align-items:baseline;gap:clamp(6px,4cqw,12px)}
+
+/* ── the goal's share of a tile, rolling like a ticker ──
+   The one piece of tile chrome that is neither a corner nor a caption, so it is
+   the first thing that read wrong once the cell stopped being 300px. It lives
+   here rather than inline so it can be sized in cqw: 46px on the cell the
+   number was drawn at, proportionally less on a narrow 2-up phone cell. The
+   offset is a percentage of the tile's own HEIGHT (the cell is a fixed 15:17,
+   so 15% is the same band in every column bucket), and the whole readout is
+   capped at the same 46px the mockup used so the desktop board is untouched. */
+.veeTiles .rollPct{position:absolute;top:15%;left:0;right:0;z-index:5;display:flex;justify-content:center;
+  pointer-events:none;font-family:var(--mono);font-size:clamp(28px,15.33cqw,46px);font-weight:300;
+  letter-spacing:.02em;font-variant-numeric:tabular-nums;opacity:.9;
+  transition:color .8s ease,text-shadow .8s ease}
 
 /* Core-tile graphic: STRONG + confident, not fading into the tile. The primary
    line reads at real opacity with a soft mint glow (so it pops off the glass like
@@ -137,7 +170,15 @@
 
 /* ── Vee centre ── (grid placement handled by .veeTiles .grid .vee above) */
 .veeTiles .vee{align-items:center;justify-content:center;text-align:center}
-.veeTiles .vee .disc{position:absolute;left:50%;top:45%;width:320px;height:320px;transform:translate(-50%,-50%);z-index:1;pointer-events:none;
+/* The disc is a soft glow behind the mentor, and 320px is exactly right for the
+   desktop hero — so it keeps 320px and only gives ground when the hero itself
+   is narrower than that. 88% of the hero's own width, kept square by
+   aspect-ratio instead of a second fixed number, means the glow can never be
+   clipped by the tile's own overflow:hidden on a 320-375px phone. (The VeeArt
+   SVG behind it does not need the same care: preserveAspectRatio is the default
+   `meet`, so a viewBox 434x250 always letterboxes inside whatever box it gets.) */
+.veeTiles .vee .disc{position:absolute;left:50%;top:45%;width:min(320px,88%);aspect-ratio:1;
+  transform:translate(-50%,-50%);z-index:1;pointer-events:none;
   background:radial-gradient(circle,rgba(110,231,183,.11) 0%,rgba(110,231,183,.05) 42%,transparent 66%);
   animation:veeDisc 9s var(--vease) infinite}
 @keyframes veeDisc{0%,100%{opacity:.75;transform:translate(-50%,-50%) scale(.97)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.03)}}
@@ -357,7 +398,7 @@
   padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.07);flex:none}
 .veeTiles .openTitle{font-family:var(--serif);font-style:italic;font-size:20px;letter-spacing:.3px;
   color:rgba(255,255,255,.92);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.veeTiles .openClose{flex:none;width:34px;height:34px;display:grid;place-items:center;
+.veeTiles .openClose{flex:none;width:var(--touch);height:var(--touch);display:grid;place-items:center;
   border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.03);color:rgba(255,255,255,.7);
   border-radius:10px;cursor:pointer;transition:all .18s var(--vease)}
 .veeTiles .openClose:hover{border-color:var(--mint);color:var(--mint)}
@@ -373,9 +414,12 @@
   animation:openPage .32s var(--vease) both}
 .veeTiles .openOverlay.openFull .openTop{padding:max(14px,env(safe-area-inset-top)) 20px 12px;
   border-bottom:1px solid rgba(255,255,255,.06)}
+/* The way out of a filled tile, and the only way out on a phone. The top bar is
+   fixed-height chrome above a full-bleed iframe, so giving the link the full
+   touch target costs a few pixels of the tile, not a layout reflow. */
 .veeTiles .openBack{display:inline-flex;align-items:center;gap:10px;border:0;background:none;cursor:pointer;
   font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
-  color:rgba(167,243,208,.78);padding:4px 2px;transition:color .18s var(--vease)}
+  color:rgba(167,243,208,.78);min-height:var(--touch);transition:color .18s var(--vease)}
 .veeTiles .openBack:hover{color:var(--mint)}
 .veeTiles .openSlotName{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
   color:rgba(255,255,255,.38);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

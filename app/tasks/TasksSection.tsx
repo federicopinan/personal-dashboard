@@ -178,26 +178,42 @@ export default function TasksSection() {
       </div>
       {/* The composer above stays mounted while a day is loading, on purpose:
           unmounting it would throw away a half-typed task and the caret with
-          it. The rows below are the part that must never be stale. */}
-      <button type="button" onClick={() => { const prev = new Date(`${day}T12:00:00`); prev.setDate(prev.getDate() - 1); const source = localDateKey(prev); try { const prior = JSON.parse(localStorage.getItem(`vitality:tasks:${source}`) || '[]'); const targetIds = new Set(tasks.map(t => t.id)); const carry = prior.filter((t: { id: string; done: boolean }) => !t.done && !targetIds.has(t.id)); if (carry.length) save([...tasks, ...carry.map((t: { id: string; text: string }) => ({ id: t.id, text: t.text, done: false }))]); else setError('No new incomplete tasks to carry forward.') } catch { setError('Could not read the previous date’s tasks.') } }} style={{ marginBottom: 12, padding: '7px 12px', borderRadius: 8, background: 'transparent', color: 'var(--fg)', border: '1px solid var(--border)' }}>Carry incomplete tasks from previous date</button>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          it. The rows below are the part that must never be stale.
+
+          The button reads short because it has to: it is a 46-character
+          sentence on its own line, and on a 320px phone that is three wrapped
+          lines for one secondary action sitting above the composer. The full
+          sentence is what the title and aria-label say, so nothing about what it
+          does is lost — the heading above already scopes it to a day, and the
+          tooltip reads the same on a mouse as on a thumb. */}
+      <button type="button" onClick={() => { const prev = new Date(`${day}T12:00:00`); prev.setDate(prev.getDate() - 1); const source = localDateKey(prev); try { const prior = JSON.parse(localStorage.getItem(`vitality:tasks:${source}`) || '[]'); const targetIds = new Set(tasks.map(t => t.id)); const carry = prior.filter((t: { id: string; done: boolean }) => !t.done && !targetIds.has(t.id)); if (carry.length) save([...tasks, ...carry.map((t: { id: string; text: string }) => ({ id: t.id, text: t.text, done: false }))]); else setError('No new incomplete tasks to carry forward.') } catch { setError('Could not read the previous date’s tasks.') } }} title="Carry incomplete tasks from previous date" aria-label="Carry incomplete tasks from previous date" style={{ marginBottom: 12, minHeight: 'var(--touch)', padding: '0 14px', borderRadius: 8, background: 'transparent', color: 'var(--fg)', border: '1px solid var(--border)' }}>Carry forward</button>
+      {/* flexWrap + minWidth:0 on the input is what makes this row survive 320px:
+          the Add button is nowrap and must not shrink, so the input is the only
+          thing allowed to give way — and when the row runs out of room it wraps
+          the buttons onto a second line at full width instead of overflowing. */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') addTask() }}
           placeholder="Add a task..."
-          style={{ flex: 1, padding: '10px 14px', minHeight: 42, borderRadius: 8, border: '1px solid var(--border, #262626)', background: 'var(--bg, #0a0a0a)', color: 'var(--fg, #fff)', fontSize: 16, outline: 'none' }}
+          style={{ flex: '1 1 180px', minWidth: 0, padding: '10px 14px', minHeight: 'var(--touch)', borderRadius: 8, border: '1px solid var(--border, #262626)', background: 'var(--bg, #0a0a0a)', color: 'var(--fg, #fff)', fontSize: 16, outline: 'none' }}
         />
-        <button onClick={addTask} style={{ padding: '10px 18px', minHeight: 42, borderRadius: 8, border: 'none', background: 'var(--mint, #6EE7B7)', color: 'var(--mint-ink, #042a1c)', fontWeight: 600, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap' }}>
+        <button onClick={addTask} style={{ padding: '0 18px', minHeight: 'var(--touch)', borderRadius: 8, border: 'none', background: 'var(--mint, #6EE7B7)', color: 'var(--mint-ink, #042a1c)', fontWeight: 600, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap' }}>
           Add
         </button>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {ready && tasks.map(t => (
-          <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--bg-elevated, #121212)', borderRadius: 8, border: '1px solid var(--border, #1c1c1c)' }}>
-            <input type="checkbox" checked={t.done} onChange={() => toggle(t.id)} style={{ accentColor: 'var(--mint, #6EE7B7)', width: 16, height: 16, cursor: 'pointer' }} />
-            <span style={{ flex: 1, fontSize: 14, color: 'var(--fg)', textDecoration: t.done ? 'line-through' : 'none', opacity: t.done ? 0.5 : 1 }}>{t.text}</span>
-            <button onClick={() => deleteTask(t.id)} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 2, fontSize: 16, lineHeight: 1 }} title="Delete">×</button>
+          <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px 4px 0', background: 'var(--bg-elevated, #121212)', borderRadius: 8, border: '1px solid var(--border, #1c1c1c)' }}>
+            {/* The checkbox is 20px; the label around it is the 44px target, and
+                because it wraps the input a tap on the label toggles the task
+                exactly as a tap on the box does. */}
+            <label style={{ display: 'grid', placeItems: 'center', flex: '0 0 auto', width: 'var(--touch)', minHeight: 'var(--touch)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={t.done} onChange={() => toggle(t.id)} style={{ accentColor: 'var(--mint, #6EE7B7)', width: 20, height: 20, cursor: 'pointer' }} />
+            </label>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: 'var(--fg)', textDecoration: t.done ? 'line-through' : 'none', opacity: t.done ? 0.5 : 1 }}>{t.text}</span>
+            <button onClick={() => deleteTask(t.id)} style={{ flex: '0 0 auto', display: 'grid', placeItems: 'center', width: 'var(--touch)', height: 'var(--touch)', background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }} title="Delete" aria-label={`Delete ${t.text}`}>×</button>
           </div>
         ))}
         {!ready && <p role="status" style={{ color: 'var(--muted)', fontSize: 13, margin: 0 }}>Loading tasks...</p>}

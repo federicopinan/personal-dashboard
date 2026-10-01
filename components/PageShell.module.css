@@ -29,6 +29,16 @@
     calc(var(--space-16) + env(safe-area-inset-bottom));
 }
 
+/* Below the board's 760 stop the gutters come down to --space-4, the same
+   value app/app/dashboard.module.css uses, so a page and the board it was
+   reached from never disagree about how wide the app's margin is. */
+@media (max-width: 760px) {
+  .shell {
+    padding: calc(var(--space-8) + env(safe-area-inset-top)) var(--space-4)
+      calc(var(--space-12) + env(safe-area-inset-bottom));
+  }
+}
+
 .back {
   display: inline-flex;
   align-items: center;
@@ -36,6 +46,12 @@
   color: var(--muted);
   font-size: 13px;
   text-decoration: none;
+  /* The link is only as tall as its text, which is not a target. The padding
+     makes it one; the negative margin hands the space back so the title below
+     does not move. */
+  min-height: var(--touch);
+  padding: 12px 4px;
+  margin: -12px -4px;
   transition: color var(--duration) var(--ease);
 }
 

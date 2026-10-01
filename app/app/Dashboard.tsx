@@ -78,16 +78,20 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
     fontFamily: 'ui-monospace, Menlo, monospace',
     letterSpacing: '.08em',
   }
+  // The pill's box (padding, height, radius) is in dashboard.module.css because a
+  // tab has to reach --touch on a phone and an inline style cannot be reached by
+  // a media query. Only the selected/unselected colours stay here, since they
+  // are state, not shape.
   const pill = (id: TabType, label: string) => (
     <button
       key={id}
       type="button"
       onClick={() => { setTab(id); setArmed(false) }}
+      className={styles.sheetTab}
       style={{
-        ...mono, fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase',
+        ...mono, letterSpacing: '.12em', textTransform: 'uppercase',
         color: tab === id ? 'var(--fg, #fff)' : 'var(--muted, #8a8f98)',
         background: tab === id ? 'rgba(255,255,255,.08)' : 'transparent',
-        border: 'none', borderRadius: 999, padding: '7px 13px', cursor: 'pointer',
       }}
     >
       {label}
@@ -110,23 +114,23 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
     <div
       role="dialog" aria-modal="true" aria-label="Settings"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
-      style={{ position: 'fixed', inset: 0, zIndex: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(0,0,0,.62)', backdropFilter: 'blur(6px)' }}
+      className={styles.sheetScrim}
     >
-      <div style={{ width: 'min(540px, 100%)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-elevated, #121212)', border: '1px solid var(--border, #262626)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,.6)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px 10px', borderBottom: '1px solid var(--border, #262626)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: 2, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', maxWidth: 'calc(100% - 36px)' }}>
+      <div className={styles.sheetCard}>
+        <div className={styles.sheetTop}>
+          <div className={styles.sheetTabs}>
             {pill('profile', 'profile')}
             {pill('goals', 'equation')}
             {pill('data', 'data')}
             {pill('how', 'info')}
             {pill('yours', 'style')}
           </div>
-          <button type="button" aria-label="Close" onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--muted, #8a8f98)', cursor: 'pointer', padding: 4, display: 'flex' }}>
+          <button type="button" aria-label="Close" onClick={onClose} className={styles.sheetClose}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" /></svg>
           </button>
         </div>
 
-        <div style={{ overflowY: 'auto', padding: '20px 24px' }}>
+        <div className={styles.sheetBody}>
           {tab === 'profile' && (
             <div>
               <p style={{ fontWeight: 600, color: 'var(--fg, #fff)', margin: '0 0 14px', fontSize: 15 }}>User profile</p>
