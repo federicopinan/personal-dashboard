@@ -95,6 +95,12 @@ export function useTileHost(
       // whitelisted to the data slots (never 'vee' or internals).
       if (msg.type === 'read') {
         const slot = String(msg.slot || '')
+        // 'water' is a RETIRED slot, not a live one: there is no Water tile any
+        // more, but fuel.html has to read that slot once to bring the days
+        // logged there across into Fuel. Drop this entry in the same commit
+        // that makes the retired Water history unnecessary, or the number is
+        // stranded in a slot nothing can reach. It is read-only and the data is
+        // the user's own, so it grants nothing the other entries do not.
         const READABLE = ['train', 'fuel', 'vitals', 'sleep', 'screen', 'water', 'peak', 'finance']
         if (!READABLE.includes(slot)) {
           src.postMessage({ source: 'vitality-host', type: 'read:error', id: msg.id, reason: 'slot_not_allowed' }, '*')

@@ -50,19 +50,23 @@ export interface Notice {
 /**
  * The shipped weights, per goal.
  *
- * SCREEN and WATER arrived together, and every goal was REBALANCED rather than
- * extended: eight inputs cannot share 100% with two appended to the old six, so
- * the numbers below were taken out of the inputs each new tile competes with.
- * The reasoning, so a later retune does not have to reverse-engineer it:
+ * SCREEN arrived as a seventh input and was REBALANCED rather than extended:
+ * seven inputs cannot share 100% with one appended to the old six, so the
+ * numbers below were taken out of the inputs the new tile competes with. The
+ * reasoning, so a later retune does not have to reverse-engineer it:
  *
  * - SCREEN is a COST, and it is the mentor's own stated reason for wanting the
  *   tile ("SOC + trading = you LIVE on screens"). So it earns its share from the
  *   goals whose work IS the screen: highest on trader, next on soc-analyst,
  *   lowest on jacked, where the screen is incidental to the goal.
- * - WATER is small everywhere. It is a background input: real, cheap to log, and
- *   not what any of these three goals is actually about. It is worth the most
- *   where recovery is already being watched (jacked, overall) and least where
- *   the goal is measured in hours at a screen.
+ *
+ * WATER is no longer a weight of its own. It was never a separate tile for long
+ * — it was a separate id, tracking the same glasses the Fuel stub had always
+ * tracked, and now it lives INSIDE fuel.html. So its share did not vanish: it
+ * was folded into that goal's `fuel` weight, which is the tile that still
+ * carries the number. That is why every goal below has one fewer input and the
+ * same 100: the 2–6 points water used to hold are now inside fuel, and no other
+ * tile moved by a single point.
  *
  * A saved goal gets both keys filled in automatically (withShippedWeights only
  * fills ABSENT keys), but its OTHER weights stay exactly as the user last set
@@ -74,19 +78,20 @@ export const DEFAULT_GOALS: Goal[] = [
     id: 'soc-analyst',
     title: 'SOC Blue Team analyst',
     accent: '#00D4FF',
-    // screen 6, water 2 come out of finance (which is where a screen-bound
-    // analyst spends the time finance used to stand in for).
-    weights: { train: 4, fuel: 4, vitals: 19, sleep: 12, screen: 6, water: 2, peak: 5, finance: 48 },
+    // screen 6 comes out of finance (which is where a screen-bound analyst
+    // spends the time finance used to stand in for); the 2 water used to hold
+    // sit in the same place, and are now inside fuel 6.
+    weights: { train: 4, fuel: 6, vitals: 19, sleep: 12, screen: 6, peak: 5, finance: 48 },
     progress: 5,
   },
   {
     id: 'jacked',
     title: 'Get jacked',
     accent: '#FF6B6B',
-    // screen 2 (incidental here), water 6 (recovery-adjacent, and the one the
-    // mentor already listed as this goal's idea) — paid for by fuel, the input
-    // hydration most overlaps.
-    weights: { train: 43, fuel: 20, vitals: 12, sleep: 12, screen: 2, water: 6, peak: 5 },
+    // screen 2 (incidental here) is paid for by fuel, and so are the 6 water
+    // used to hold — the one the mentor already listed as this goal's idea, and
+    // the one hydration most overlaps. Both now sit in fuel 26.
+    weights: { train: 43, fuel: 26, vitals: 12, sleep: 12, screen: 2, peak: 5 },
     progress: 10,
   },
   {
@@ -95,7 +100,7 @@ export const DEFAULT_GOALS: Goal[] = [
     accent: '#FFD700',
     // screen 8 is the highest anywhere, and out of finance: the screen IS the
     // trading desk, so screen time is the honest proxy finance was carrying.
-    weights: { train: 4, fuel: 4, vitals: 8, sleep: 7, screen: 8, water: 2, peak: 5, finance: 62 },
+    weights: { train: 4, fuel: 6, vitals: 8, sleep: 7, screen: 8, peak: 5, finance: 62 },
     progress: 5,
   },
 ]
@@ -106,9 +111,9 @@ export const OVERALL_GOAL: Goal = {
   id: 'overall',
   title: "A SOC analyst who's jacked and trades",
   accent: '#00D4FF',
-  // The synthesis, so screen lands between soc-analyst and trader, and water
-  // between overall and jacked.
-  weights: { train: 16, fuel: 8, vitals: 15, sleep: 10, screen: 6, water: 4, peak: 5, finance: 36 },
+  // The synthesis, so screen lands between soc-analyst and trader; the 4 water
+  // used to hold are now inside fuel 12, between overall and jacked.
+  weights: { train: 16, fuel: 12, vitals: 15, sleep: 10, screen: 6, peak: 5, finance: 36 },
   progress: 5,
 }
 
@@ -161,7 +166,9 @@ export const DEFAULT_IDEAS: Record<string, TileIdea[]> = {
   // suggesting it would be the mentor asking for something you already have.
   // Same for the two that arrived with it. The Screen idea used to sit here and
   // the Water idea sat under `jacked`; both tiles now ship, so both are gone for
-  // the same reason. What is left in this file is a list of what the board is
+  // the same reason — and the Water idea is gone for a second one besides:
+  // hydration lives inside Fuel, so there is no separate water thing left to
+  // ask for. What is left in this file is a list of what the board is
   // STILL missing — that is the whole job of it, and a gap the user has since
   // closed is not a gap any more. `overall` is kept as an empty array rather than
   // deleted so tileIdeas' `?? DEFAULT_IDEAS.overall` fallback still resolves to

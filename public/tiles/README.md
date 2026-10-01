@@ -19,7 +19,6 @@ shows the "how to build this" panel instead.
 | `vitals` | Vitals   | `public/tiles/vitals.html` |
 | `sleep`  | Sleep    | `public/tiles/sleep.html`  |
 | `screen` | Screen   | `public/tiles/screen.html` |
-| `water`  | Water    | `public/tiles/water.html`  |
 | `vee`    | Vee      | `public/tiles/vee.html`    |
 | `peak`   | Peak     | `public/tiles/peak.html`   |
 | `finance`| Finance  | `public/tiles/finance.html`|
@@ -73,3 +72,13 @@ Any tile reading the hours must look back one night from the day it is
 displaying. `vitals.html` and `peak.html` both do this; the date helpers are
 copied into each file on purpose, because a tile is one sealed file with no
 imports and no network, so there is nowhere to share them from.
+
+### Fuel is keyed by the day, and it owns the water
+
+`fuel.html` keeps glasses of water, one entry per calendar **day** — a day is
+stored under the day it happened, so no shift applies — as
+`{ target, 'YYYY-MM-DD': { glasses } }`. It also still carries the older
+`{ water: { 'YYYY-MM-DD': count } }` object in the same store and imports from it
+on every load, so `/sweep` and `save_data` can keep filing into the old shape.
+There is no `water` slot: hydration moved into Fuel, so a second tile logging the
+same number would be a second store for one fact.

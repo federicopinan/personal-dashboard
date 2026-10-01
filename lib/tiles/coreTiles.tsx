@@ -26,7 +26,6 @@ export type CoreTileId =
   | 'vitals'
   | 'sleep'
   | 'screen'
-  | 'water'
   | 'peak'
   | 'finance'
 
@@ -179,30 +178,6 @@ export const CORE_TILES: Record<CoreTileId, CoreTile> = {
       </svg>
     ),
   },
-  water: {
-    id: 'water',
-    href: '/app/starter',
-    index: '09',
-    label: 'Water',
-    // The orb walks down the glass wall, then swaps to the water line inside
-    // it: the same two-path 'wander' the Sleep tile uses for its ring and its
-    // pillow, on a path pair that is unmistakably a drink.
-    orb: { mode: 'wander' },
-    defaultSize: 's',
-    glyph: (
-      <svg viewBox="-12 -12 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round">
-        <path d="M-6 -8 L6 -8 L4.5 8 L-4.5 8 Z" />
-        <path d="M-5.4 -3 L5.4 -3" />
-      </svg>
-    ),
-    art: (
-      <svg className="art" viewBox="0 0 210 250">
-        <path className="mot" d="M64 92 L73 198 L137 198 L146 92" />
-        <path className="motd" d="M68 150 Q80 142 92 150 T116 150 T140 150" />
-        <g className="orb"><circle className="glow" r="10" /><circle className="node" r="3.4" /></g>
-      </svg>
-    ),
-  },
   peak: {
     id: 'peak',
     href: '/app/starter',
@@ -306,10 +281,10 @@ export type HomeTileId = CoreTileId | 'vee' | 'library'
  * 2-wide band high in the second row (the always-on "your apps" shelf, the
  * platform's front door; building and uploading tiles live inside it), Vee the
  * 2x2 centre, talls down the sides, Finance a 2-wide band at the foot. Sleep
- * sits beside Vitals because it feeds it, Screen goes straight after it because
- * that pairing is the whole reason Screen exists, and Water follows as the
- * second half of what the Fuel stub was really logging. Every tile drags,
- * resizes, and can be removed. User-built tiles append.
+ * sits beside Vitals because it feeds it, and Screen goes straight after it
+ * because that pairing is the whole reason Screen exists. Hydration is not a
+ * tile of its own: it lives inside Fuel, which is what Fuel's one number always
+ * was. Every tile drags, resizes, and can be removed. User-built tiles append.
  *
  * Adding a tile here is SAFE for existing boards: DashboardGrid seeds its order
  * from this list only when `vitality:eq:order` is empty, and a saved order
@@ -322,7 +297,6 @@ export const DEFAULT_HOME_ORDER: HomeTileId[] = [
   'vitals',
   'sleep',
   'screen',
-  'water',
   'vee',
   'peak',
   'finance',

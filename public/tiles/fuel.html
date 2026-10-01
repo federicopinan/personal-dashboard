@@ -2,104 +2,828 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#050505" />
 <title>Fuel</title>
 <!--
-  FUEL — almost nothing, on purpose. One number (water today), one button.
-  The week draws itself underneath. Everything else this tile could become
-  (macros, meals, caffeine) gets built WITH the mentor, on top of this.
-  Store: { water: { 'YYYY-MM-DD': count } } — /sweep and save_data can file
-  straight into it.
+  FUEL — and the one number Fuel keeps is water. That is not a rename: this file
+  was a stub whose only stored number already WAS water (`{ water: {
+  'YYYY-MM-DD': count } }`, drawn against a goal of 8), and a separate Water
+  tile was then built to hold that same history properly. It has been retired
+  and its implementation lives here, so there is one tile, one store and one
+  history for the same number.
+
+  Store: { target: <number>, 'YYYY-MM-DD': { glasses: <number> } } — a flat map
+  of date keys, so the `target` key is skipped by the same isDateKey filter every
+  other date helper here uses. The legacy `water` sub-object is LEFT IN PLACE
+  beside them (see MIGRATION), which is why /sweep and save_data, which file
+  straight into the old shape, still have somewhere to write.
+
+  MIGRATION — two sources, both non-destructive and both idempotent, so the
+  history survives the merge in every direction:
+    1. the legacy `{ water: { 'YYYY-MM-DD': count } }` sitting in THIS tile's own
+       slot (every Fuel user who ever logged a glass), and
+    2. whatever is still in the retired `water` slot (anyone who opened the
+       Water tile before it went).
+  Each is imported one DAY at a time, whenever that day is MISSING here — never
+  "on the first load", which is the gate that used to disable a migration
+  permanently after one hand-logged day or one read timeout. A day this tile
+  already holds always wins, so a re-run can never clobber a log, never import a
+  day twice, and a dropped import save just means the next open picks the same
+  days up. Between the two sources the legacy Fuel copy wins, because that is
+  this tile's own older data; the retired Water tile is a guest here.
+
+  THE TARGET IS THE USER'S, NOT OURS. It starts at 8 because that is the number
+  this stub was already drawing against, so imported history reads the same here
+  as it did — and it is capped at 24 for a layout reason (the reference line has
+  to stay on the chart), not a health reason. Nothing in this file names a figure
+  as recommended, because this tile has no business doing that. normTarget is a
+  range check, nothing more.
+
+  SINGLE OWNER: the bridge has no cross-tile write, so nothing can write this
+  number behind the tile's back. Sleep left Vitals the same way.
+
+  SCALE: a fixed 0–24 glass domain, so the target line keeps meaning the same
+  height every day. A 0-glass day draws a stub and a day with no entry draws a
+  faint tick — a zero and an absence are different facts, which is why
+  normGlasses accepts a real 0 and refuses to invent one.
+
+  Sealed: no network, no imports, no bundler. window.Vitality is the host's.
+
+  The PURE:BEGIN/PURE:END block below is dependency-free by construction so the
+  date + scale math can be exercised outside a browser. Do not put DOM or bridge
+  calls inside it.
 -->
 <style>
   :root{
-    --bg:#050506;--fg:#ededf0;--brand:#6EE7B7;--brand-soft:rgba(110,231,183,.08);
-    --muted:#84848c;--muted-strong:#a8a8b0;--border:#1d1d22;
-    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
-    --serif:Georgia,'Times New Roman',serif;
-    --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;
-    --ease:cubic-bezier(.16,1,.3,1);
+    --fg:#ffffff;
+    --mint:#6EE7B7;
+    --mint-hi:#d4fce8;
+    --mint-deep:#1f4d3d;
+    --mint-glow:rgba(110,231,183,0.5);
+    --amber:#F59E0B;
+    --amber-soft:rgba(245,158,11,0.16);
+    --iris:#a78bfa;
+    --muted:rgba(255,255,255,0.5);
+    --muted-strong:rgba(255,255,255,0.7);
+    --border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.14);
+    --card:rgba(255,255,255,0.02);
+    --card-elev:rgba(255,255,255,0.04);
+    --ease-premium:cubic-bezier(0.16,1,0.3,1);
+    --ease-soft:cubic-bezier(0.22,1,0.36,1);
+    --font-serif:'Instrument Serif',Georgia,'Times New Roman',serif;
+    --font-mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+    --r-lg:20px;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
-  body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--font);display:flex;justify-content:center;padding:40px 20px;-webkit-font-smoothing:antialiased;position:relative}
-  body::before{content:'';position:fixed;inset:0;z-index:-2;pointer-events:none;background:
-    radial-gradient(58% 44% at 50% -6%, rgba(110,231,183,.13), transparent 62%),
-    radial-gradient(1.5px 1.5px at 14% 16%, rgba(255,255,255,.5), transparent 100%),
-    radial-gradient(1px 1px at 76% 10%, rgba(255,255,255,.4), transparent 100%),
-    radial-gradient(1.5px 1.5px at 52% 6%, rgba(255,255,255,.32), transparent 100%),
-    radial-gradient(1px 1px at 30% 28%, rgba(255,255,255,.28), transparent 100%)}
-  body::after{content:'';position:fixed;left:0;right:0;bottom:0;height:32vh;z-index:-1;pointer-events:none;background:
-    linear-gradient(to top, rgba(8,19,14,.85), transparent 80%),
-    linear-gradient(115deg, transparent 42%, rgba(13,26,23,.75) 43%, rgba(13,26,23,.75) 58%, transparent 59%),
-    linear-gradient(245deg, transparent 38%, rgba(10,18,16,.9) 39%, rgba(10,18,16,.9) 62%, transparent 63%);
-    -webkit-mask-image:linear-gradient(to top,#000 55%,transparent);mask-image:linear-gradient(to top,#000 55%,transparent)}
-  .shell{width:100%;max-width:560px;text-align:center}
-  h1{font-size:24px;font-weight:600;letter-spacing:-.01em;text-align:left}
-  .sub{color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin:6px 0 0;text-align:left}
+  html,body{background:#050505;color:var(--fg);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  body{padding:22px 16px 44px;position:relative;overflow-x:hidden}
+  ::selection{background:rgba(110,231,183,0.28);color:#fff}
+  .atmo{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .atmoGlow{position:absolute;left:50%;top:30%;width:820px;height:820px;transform:translate(-50%,-50%);
+    background:radial-gradient(circle,rgba(110,231,183,0.09),transparent 62%);animation:atmoBreath 11s ease-in-out infinite}
+  @keyframes atmoBreath{0%,100%{opacity:.7;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.07)}}
+  .mote{position:absolute;width:2px;height:2px;border-radius:999px;background:var(--mint);opacity:0;animation:moteDrift linear infinite}
+  @keyframes moteDrift{0%{opacity:0;transform:translateY(16px)}15%{opacity:.45}85%{opacity:.3}100%{opacity:0;transform:translateY(-110px)}}
+  .wrap{position:relative;z-index:1;max-width:560px;margin:0 auto}
 
-  .well{margin-top:44px}
-  .kick{font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--brand)}
-  .count{font-family:var(--serif);font-style:italic;font-size:clamp(72px,18vw,110px);line-height:1;color:#fff;margin-top:10px;
-    text-shadow:0 0 44px rgba(110,231,183,.25)}
-  .of{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-top:8px}
-  .btnRow{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:30px}
-  .minus{width:46px;height:46px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:20px;cursor:pointer;transition:all .15s}
-  .minus:hover{color:#fff;border-color:var(--muted)}
-  .glass{padding:16px 40px;border-radius:999px;border:none;background:linear-gradient(180deg,#8df0c9,var(--brand));color:#04140d;
-    font-weight:700;font-size:16px;cursor:pointer;box-shadow:0 10px 34px -12px var(--brand);transition:transform .15s var(--ease)}
-  .glass:hover{transform:translateY(-1px)}
-  .glass:active{transform:scale(.97)}
+  .hero{margin:4px 2px 26px;animation:fadeUp 700ms var(--ease-premium) both}
+  .heroTitle{font-family:var(--font-serif);font-size:clamp(30px,5.2vw,44px);line-height:1.02;font-weight:400;letter-spacing:-0.01em}
+  .heroTitle em{color:var(--mint);font-style:italic}
+  .heroDate{font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--muted);margin-top:10px}
 
-  .week{display:flex;justify-content:center;align-items:flex-end;gap:10px;margin-top:52px;height:64px}
-  .day{display:flex;flex-direction:column;align-items:center;gap:7px;height:100%;justify-content:flex-end}
-  .bar{width:16px;border-radius:5px 5px 3px 3px;background:linear-gradient(180deg,var(--brand),rgba(110,231,183,.25));min-height:3px;transition:height .5s var(--ease)}
-  .bar.zero{background:var(--border)}
-  .dLab{font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
-  .dLab.today{color:var(--brand)}
-  .foot{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-top:34px}
-  .starterTag{width:max-content;max-width:92%;margin:0 auto 20px;padding:6px 14px;border:1px solid rgba(110,231,183,.25);border-radius:999px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:#84848c;text-align:center}
-  .starterTag,.starterTag *{line-height:1.6}
+  .card{padding:1.4rem;border-radius:var(--r-lg);border:1px solid var(--border);background:var(--card);
+    display:flex;flex-direction:column;gap:16px;transition:border-color .2s,box-shadow .2s;margin-bottom:14px}
+  .card:hover{border-color:rgba(110,231,183,0.2);box-shadow:0 0 30px -20px var(--mint-glow)}
+  @media (max-width:520px){.card{padding:16px;gap:14px}}
+  .eyebrow{font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted-strong)}
+  .eyebrow.mint{color:var(--mint)}
+
+  /* the log */
+  .lastNight{text-align:center;padding:6px 0 2px}
+  .lnVal{font-family:var(--font-serif);font-style:italic;font-size:clamp(46px,12vw,64px);line-height:1;color:#fff;
+    font-variant-numeric:tabular-nums;text-shadow:0 0 40px rgba(110,231,183,0.2)}
+  .lnVal.none{color:var(--muted);text-shadow:none;font-size:clamp(26px,7vw,34px)}
+  .lnLab{font-family:var(--font-mono);font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-top:10px}
+  .stepRow{display:flex;align-items:center;justify-content:center;gap:18px}
+  .step{width:46px;height:46px;border-radius:999px;border:1px solid var(--border-strong);background:transparent;color:var(--muted-strong);
+    font-size:22px;line-height:1;cursor:pointer;transition:all .16s;font-family:inherit;flex:none}
+  .step:hover{color:#fff;border-color:var(--mint)}
+  .step:disabled{opacity:.35;cursor:default;color:var(--muted)}
+  .stepVal{font-family:var(--font-serif);font-style:italic;font-size:34px;color:#fff;min-width:118px;text-align:center;font-variant-numeric:tabular-nums}
+  .stepVal small{font-family:var(--font-mono);font-style:normal;font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);display:block;margin-top:4px}
+  .saveBtn{width:100%;border:none;border-radius:999px;padding:13px;font-size:14.5px;font-weight:600;font-family:inherit;
+    background:linear-gradient(180deg,#8df0c9,var(--mint));color:#04140d;cursor:pointer;transition:filter .18s,transform .12s var(--ease-soft)}
+  .saveBtn:hover{filter:brightness(1.05)}
+  .saveBtn:disabled{opacity:.5;cursor:default;filter:none}
+  .saveMsg{font-family:var(--font-mono);font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;text-align:center;min-height:14px;color:var(--muted)}
+  /* Shown once, when the import actually brought days across. Say what
+     happened and how much, so a chart that suddenly has history is explained
+     rather than a surprise. Never shown when nothing crossed. */
+  .migrated{font-size:12.5px;line-height:1.6;color:var(--muted-strong);text-align:center;padding:0 6px}
+  .migrated[hidden]{display:none}
+  .saveMsg.ok{color:var(--mint)}
+  .saveMsg.bad{color:var(--amber)}
+
+  /* the chart */
+  .chartHead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--border);border-radius:999px;background:var(--card)}
+  .segBtn{border:none;background:transparent;color:var(--muted);font-family:var(--font-mono);font-size:0.58rem;letter-spacing:0.12em;
+    text-transform:uppercase;padding:6px 11px;border-radius:999px;cursor:pointer;transition:background .18s,color .18s;white-space:nowrap}
+  .segBtn[aria-current="true"]{background:rgba(110,231,183,0.16);color:var(--mint)}
+  .stage{position:relative;width:100%}
+  .stage svg{display:block;width:100%;height:auto;overflow:visible}
+  .barRise{transform-box:fill-box;transform-origin:bottom;animation:barRise 460ms var(--ease-premium) both}
+  @keyframes barRise{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+  .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;
+    font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted)}
+  .cap{font-family:var(--font-mono);font-size:0.56rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);
+    display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  .key{display:inline-flex;align-items:center;gap:7px}
+  .keyBar{width:9px;height:12px;border-radius:2px;background:linear-gradient(180deg,var(--mint),rgba(110,231,183,0.3))}
+  .keyZero{width:9px;height:2px;background:var(--mint);border-radius:1px}
+  .keyNone{width:9px;height:9px;border:1px solid var(--border-strong);border-radius:1px}
+  .keyRef{width:16px;border-top:1px dashed var(--mint);opacity:.8}
+  .stats{display:flex;gap:10px;flex-wrap:wrap}
+  .stat{flex:1 1 120px;min-width:0;border:1px solid var(--border);border-radius:12px;background:var(--card-elev);padding:11px 13px}
+  .statL{font-family:var(--font-mono);font-size:0.54rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted)}
+  .statV{font-family:var(--font-serif);font-size:1.4rem;line-height:1.1;margin-top:5px;color:var(--fg);font-variant-numeric:tabular-nums}
+  .statV em{font-style:normal;font-size:0.7rem;color:var(--muted-strong);margin-left:3px}
+  .statV.dim{color:var(--muted)}
+  .foot{font-family:var(--font-mono);font-size:0.54rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);text-align:center;margin-top:22px}
+  .note{font-size:12.5px;line-height:1.6;color:var(--muted-strong)}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none !important;opacity:1 !important;transform:none !important}
+  }
+
+  /* the target row: a number the user owns, so it is stated in the same words
+     everywhere — never a recommendation, never a health claim. */
+  .goal{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+    padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--card-elev)}
+  .goalL{font-family:var(--font-mono);font-size:0.54rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted)}
+  .goalNote{font-size:12px;line-height:1.55;color:var(--muted);flex:1 1 200px;min-width:0}
+  .goalCtl{display:flex;align-items:center;gap:12px;flex:none}
+  .goalCtl .step{width:36px;height:36px;font-size:18px}
+  .goalV{font-family:var(--font-serif);font-style:italic;font-size:1.5rem;line-height:1;color:#fff;min-width:56px;text-align:center;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
-<div class="shell">
-<div class="starterTag">✦ starter — personal tile · click to log or edit</div>
-  <h1>Fuel</h1>
-  <p class="sub">water today · that's it — build the rest with your mentor</p>
-  <div class="well" id="app"></div>
+<div class="atmo" id="atmo" aria-hidden="true"><div class="atmoGlow"></div></div>
+<div class="wrap">
+  <div class="hero">
+    <div class="heroTitle">Water <em>today</em></div>
+    <div class="heroDate" id="heroDate">&nbsp;</div>
+  </div>
+
+  <!-- log -->
+  <section class="card">
+    <div class="eyebrow">Log a day</div>
+    <div class="lastNight">
+      <div class="lnVal" id="lnVal">&mdash;</div>
+      <div class="lnLab" id="lnLab">the day being logged</div>
+    </div>
+    <div class="stepRow">
+      <button type="button" class="step" id="minus" aria-label="One glass less">&minus;</button>
+      <span class="stepVal" id="stepVal">0<small>glasses</small></span>
+      <button type="button" class="step" id="plus" aria-label="One glass more">+</button>
+    </div>
+    <button type="button" class="saveBtn" id="save">Save today</button>
+    <div class="saveMsg" id="saveMsg"></div>
+    <div class="migrated" id="migrated" hidden></div>
+  </section>
+
+  <!-- the target. The user's own number, and the tile says so. -->
+  <section class="card">
+    <div class="eyebrow">Your target</div>
+    <div class="goal">
+      <div class="goalCtl">
+        <button type="button" class="step" id="tminus" aria-label="Target one glass lower">&minus;</button>
+        <span class="goalV" id="tval">8</span>
+        <button type="button" class="step" id="tplus" aria-label="Target one glass higher">+</button>
+      </div>
+      <p class="goalNote">A number you set, kept against the dashed line. This tile does not recommend one &mdash; it just draws yours.</p>
+    </div>
+    <p class="note">Water is the one number Fuel keeps today. Food, caffeine and the rest get built with your mentor, on top of this.</p>
+  </section>
+
+  <!-- the chart -->
+  <section class="card">
+    <div class="chartHead">
+      <div class="eyebrow">Glasses a day &middot; newest bar is today</div>
+      <div class="seg" id="seg"></div>
+    </div>
+    <div class="stage" id="stage"></div>
+    <div class="cap">
+      <span class="key"><i class="keyBar"></i> logged</span>
+      <span class="key"><i class="keyZero"></i> logged 0</span>
+      <span class="key"><i class="keyNone"></i> no entry</span>
+      <span class="key"><i class="keyRef"></i> your target</span>
+      <span class="key">g = glasses</span>
+    </div>
+  </section>
+
+  <!-- the readouts -->
+  <section class="card">
+    <div class="eyebrow">This window &middot; days only</div>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <p class="foot">each bar is one day &middot; the dashed line is the target you set &middot; 24 glasses is the ceiling on the stepper</p>
 </div>
 <script>
-const GOAL=8;
-let store={};
-function key(d){const x=d||new Date();return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');}
-function persist(){window.Vitality.save(store)}
-function today(){if(!store.water||typeof store.water!=='object')store.water={};return store.water}
-function render(){
-  const w=today(),n=w[key()]||0;
-  let bars='';
-  for(let i=6;i>=0;i--){
-    const d=new Date();d.setDate(d.getDate()-i);
-    const c=w[key(d)]||0,h=Math.max(3,Math.min(64,(c/GOAL)*64));
-    const lab=i===0?'today':['SU','MO','TU','WE','TH','FR','SA'][d.getDay()];
-    bars+='<div class="day"><div class="bar'+(c?'':' zero')+'" style="height:'+h+'px" title="'+c+'"></div><span class="dLab'+(i===0?' today':'')+'">'+lab+'</span></div>';
-  }
-  document.getElementById('app').innerHTML=
-    '<div class="kick">✦ water</div>'
-    +'<div class="count">'+n+'</div>'
-    +'<div class="of">of '+GOAL+' today</div>'
-    +'<div class="btnRow"><button class="minus" data-d="-1" aria-label="Remove one">−</button><button class="glass" data-d="1">+ Log a glass</button></div>'
-    +'<div class="week">'+bars+'</div>'
-    +'<p class="foot">feeds your peak score · the mentor notices the pattern</p>';
+/* ═══ PURE:BEGIN — no DOM, no bridge, no Date.now(). Everything below is a
+   pure function of its arguments so the maths can be checked outside a browser. ═══ */
+/* THE DAY IS THE KEY, unshifted: a day's glasses belong to that day. Same
+   addDays/shiftKey primitives as sleep.html — a night is stored under the day
+   it BEGAN, a day is stored under the day it happened, and the two files share
+   the date maths so the conventions can never drift. That is also why the
+   legacy Fuel history needs no shift: this stub keyed a day by the day it
+   happened, exactly as this file does. */
+var GLASS_MIN=0, GLASS_MAX=24, GLASS_STEP=1;
+var TARGET_MIN=1, TARGET_MAX=24, TARGET_DEFAULT=8;
+var WINDOWS=[7,14,0];               // 0 = every day on record
+var WINDOW_LABELS=['7 days','14 days','all'];
+var DAY_NAMES=['Su','Mo','Tu','We','Th','Fr','Sa'];
+var MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var DAY_LONG=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+var MONTH_LONG=['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+/** Local YYYY-MM-DD. Local fields on purpose: a UTC key rolls the date. */
+function dateKey(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
-document.addEventListener('click',e=>{
-  const b=e.target.closest('[data-d]');if(!b)return;
-  const w=today(),k=key();
-  w[k]=Math.max(0,(w[k]||0)+parseInt(b.getAttribute('data-d'),10));
-  persist();render();
+/** Parse a YYYY-MM-DD key to a Date at LOCAL midnight. `new Date(key)` would
+    parse it as UTC midnight, which is the previous day west of Greenwich. */
+function parseKey(k){
+  var p=String(k).split('-');
+  return new Date(Number(p[0]),Number(p[1])-1,Number(p[2]));
+}
+function isDateKey(k){ return typeof k==='string' && /^\d{4}-\d{2}-\d{2}$/.test(k); }
+
+/** Calendar-day arithmetic via setDate, never +86400000. A 23h or 25h DST day
+    would make the millisecond version skip or repeat a day. */
+function addDays(d,n){
+  var x=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  x.setDate(x.getDate()+n);
+  return x;
+}
+/** Shift a date KEY by whole calendar days, DST-safe, same rule as addDays. */
+function shiftKey(k,n){
+  return dateKey(addDays(parseKey(k),n));
+}
+/** The day this tile logs: today. `now` is an ARGUMENT so the clock never
+    enters the pure block, and so a test can pin it. */
+function todayKeyAt(now){ return dateKey(now); }
+
+/** The last `n` DAYS ending at (and including) endKey, oldest first.
+    n<=0 means "every day on record", which is why it also takes `all`. */
+function windowDates(endKey,n,all){
+  all=Array.isArray(all)?all:[];
+  if(!(n>0)) return all.slice();
+  var out=[],d=parseKey(endKey);
+  for(var i=n-1;i>=0;i--) out.push(dateKey(addDays(d,-i)));
+  return out;
+}
+/** Only a real whole number of glasses is a fact about a day.
+    `Number(null)`, `Number(false)`, `Number('')` and `Number([])` are ALL 0, so
+    a coercive cast invents an empty day out of an absent value — and a
+    fabricated 0 then draws a logged bar and counts as "at your target". So a
+    value must be a finite NUMBER (which is what the stepper writes and what
+    JSON round-trips) and must already sit inside the stepper's own 0–24 range.
+    A genuine 0 SURVIVES: a real day of zero glasses is a different fact from
+    not logging the day, and the chart draws them differently.
+    Out of range is REJECTED, never clamped: a clamp would write a plausible
+    looking but wrong day into a store with no backup, and the wrong value would
+    then outrank the truth forever. Rejecting costs nothing — the day simply
+    gets no bar, and a legacy day above the ceiling stays readable in the raw
+    `water` object this file leaves in place.
+    Finer than whole glasses is ROUNDED, because a glass is this tile's whole
+    resolution of a drink. */
+function normGlasses(n){
+  if(typeof n!=='number'||!isFinite(n)) return null;
+  if(n<GLASS_MIN||n>GLASS_MAX) return null;
+  return Math.round(n/GLASS_STEP)*GLASS_STEP;
+}
+/** The target is a setting, not a reading, and it is held to the same rules: a
+    real number inside the stepper's own range, rounded to whole glasses, with
+    everything else falling back to TARGET_DEFAULT rather than being stored. */
+function normTarget(n){
+  if(typeof n!=='number'||!isFinite(n)) return null;
+  if(n<TARGET_MIN||n>TARGET_MAX) return null;
+  return Math.round(n/GLASS_STEP)*GLASS_STEP;
+}
+/** The target to draw. An absent or unusable stored value falls back to the
+    default rather than to 0: a target of zero would put the reference line on
+    the baseline and say nothing at all. */
+function targetFor(store){
+  var t=store&&typeof store==='object'?normTarget(store.target):null;
+  return t==null?TARGET_DEFAULT:t;
+}
+/** The store -> ascending [{key,glasses}], skipping anything unusable. The
+    `target` key is not a date key, and neither is the legacy `water` object, so
+    this same filter leaves both alone and a store can carry all three. */
+function ownDays(store){
+  if(!store||typeof store!=='object') return [];
+  return Object.keys(store)
+    .filter(isDateKey)
+    .map(function(k){ var n=normGlasses(store[k]&&store[k].glasses); return n==null?null:{key:k,glasses:n}; })
+    .filter(Boolean)
+    .sort(function(a,b){ return a.key<b.key?-1:a.key>b.key?1:0; });
+}
+/** Does `merged` already hold a real logged day under k? The one predicate both
+    import passes ask, so "ours wins" is ONE rule and not two nearly-identical
+    ones that can drift. */
+function hasRealDay(merged,k){
+  var mine=merged[k];
+  return !!(mine&&typeof mine==='object'&&!Array.isArray(mine)&&typeof mine.glasses==='number'&&isFinite(mine.glasses));
+}
+/** File one source's days into the merged store, skipping every day already
+    held. Returns how many actually crossed, so the caller can report the real
+    number per source rather than a total it cannot attribute. */
+function fileDays(merged,src,readDay){
+  var added=0;
+  if(!src||typeof src!=='object'||Array.isArray(src)) return 0;
+  Object.keys(src).forEach(function(k){
+    if(!isDateKey(k)) return;
+    var n=normGlasses(readDay(src[k]));
+    if(n==null) return;                          // not a fact about a day
+    if(hasRealDay(merged,k)) return;            // ours wins, always
+    merged[k]={glasses:n};
+    added++;
+  });
+  return added;
+}
+/** Bring the two earlier homes of this number into ours, one DAY at a time and
+    without ever writing to either of them. Same rule, same honesty and the
+    same `imported` count as mergeSleepHistory in sleep.html.
+    1. `own.water` — the legacy `{ 'YYYY-MM-DD': count }` map the Fuel stub
+       stored in THIS slot. Keyed by the day the glasses happened, so each day
+       lands under its own key with no shift.
+    2. `waterSlot` — whatever the retired Water tile left behind, in this file's
+       own shape. Applied second, so where both sources hold a day the legacy
+       Fuel copy wins: that is this tile's own older data, and the retired tile
+       is a guest.
+    Non-destructive per DAY: a day this tile already holds — always a real
+    {glasses:<number>} the user logged by hand — ALWAYS wins, so a re-run can
+    never overwrite a log with a stale copy. Anything unparseable in our own
+    store is repaired rather than respected, because it is not a day.
+    A legacy day above the 24-glass ceiling is refused, not clamped, and is
+    left sitting in the raw `water` object rather than thrown away.
+    Fuel's goal was a code constant, so there is no legacy `target` to import
+    and TARGET_DEFAULT stands.
+    Returns the merged store plus an HONEST count per source, so the caller
+    reports what happened instead of guessing. */
+function mergeFuelHistory(own,waterSlot){
+  var merged={};
+  if(own&&typeof own==='object'&&!Array.isArray(own)){
+    Object.keys(own).forEach(function(k){ merged[k]=own[k]; });
+  }
+  var legacy=own&&typeof own==='object'&&!Array.isArray(own)?own.water:null;
+  var fromLegacy=fileDays(merged,legacy,function(v){ return v; });
+  var fromWater=fileDays(merged,waterSlot,function(v){ return v&&v.glasses; });
+  return {days:merged,imported:fromLegacy+fromWater,legacy:fromLegacy,water:fromWater};
+}
+/** How many days in a row back from `lastKey` are logged. Walks DAY keys from
+    ONE anchor passed in, never off the clock per iteration, so the streak and
+    the log card above it can never disagree about which day is last.
+    Capped so a corrupt store cannot spin here forever. */
+function dayStreak(by,lastKey){
+  var n=0;
+  for(;n<10000;n++){
+    if(!by || !by[shiftKey(lastKey,-n)]) break;
+  }
+  return n;
+}
+/** The axis ticks: the fixed 8/16/24 ladder, plus the target if the user has
+    put it somewhere off the ladder. Fixed means fixed — the ladder never moves
+    with the data — and folding the target in is what lets a set target sit ON
+    a labelled, dashed line without the domain having to move. */
+function tickList(target){
+  var out=[8,16,24],t=normTarget(target);
+  if(t!=null && out.indexOf(t)===-1){ out.push(t); out.sort(function(a,b){ return a-b; }); }
+  return out;
+}
+/** Bar geometry. n>=1 always: a one-day window divides by n, never by n-1,
+    so a single bar lands dead centre instead of NaN. */
+function barGeom(innerW,n){
+  n=Math.max(1,n|0);
+  var pitch=innerW/n, gap=pitch*0.3;
+  return {pitch:pitch, gap:gap, w:Math.max(1,pitch-gap), n:n};
+}
+/** Glasses -> y pixels, measured down from the top of the plot. Fixed domain. */
+function yForGlasses(g,geo){ return geo.top+geo.innerH*(1-Math.max(GLASS_MIN,Math.min(GLASS_MAX,g))/GLASS_MAX); }
+function baselineY(geo){ return geo.top+geo.innerH; }
+/** How many x labels fit before they collide, so the axis thins instead of
+    overprinting itself at phone width. */
+function labelStep(pitch){
+  if(pitch>=26) return 1;
+  if(pitch>=14) return 2;
+  return Math.max(2,Math.ceil(26/pitch));
+}
+function fmtGlasses(n){
+  if(n==null) return '—';
+  return n+(n===1?' glass':' glasses');
+}
+function fmtLong(key){
+  var d=parseKey(key);
+  return DAY_NAMES[d.getDay()]+' '+d.getDate()+' '+MONTHS[d.getMonth()];
+}
+/** The day's date in full. Always say WHICH day is being asked about, in the
+    same words everywhere. */
+function fmtLongDate(key){
+  var d=parseKey(key);
+  return DAY_LONG[d.getDay()]+' '+d.getDate()+' '+MONTH_LONG[d.getMonth()];
+}
+function avgGlasses(list){
+  if(!list.length) return null;
+  var s=0; for(var i=0;i<list.length;i++) s+=list[i].glasses;
+  return s/list.length;
+}
+/** How many logged days in the window reached the target. An absence is never
+    counted either way: only days with a real entry are in `list`. */
+function daysAtTarget(list,target){
+  var t=normTarget(target);
+  if(t==null) return 0;
+  var n=0; for(var i=0;i<list.length;i++) if(list[i].glasses>=t) n++;
+  return n;
+}
+/** The report payload, built to the shape lib/tiles/reportContract.ts accepts:
+    key, label, a finite value, a YYYY-MM-DD date, a kind from its fixed
+    taxonomy, and an optional direction. `intake` is the honest kind for a
+    drink, and more of it is `up`. The key stays `water_glasses` — it names the
+    NUMBER, not the tile, so it is the same stream family the retired Water tile
+    already reported. */
+function reportStream(day){
+  if(!day||day.glasses==null||!isDateKey(day.key)) return null;
+  return {key:'water_glasses',label:'Water',value:day.glasses,date:day.key,kind:'intake',goalDirection:'up'};
+}
+/* ═══ PURE:END ═══ */
+
+/* ── state ── */
+var BRIDGE = (window.Vitality && typeof window.Vitality.load === 'function') ? window.Vitality : null;
+var store = {};
+var winIdx = 0;
+var draft = 0;                       // a day opens at nothing, not at a guess
+var saveMsg = null;                  // null | {ok:boolean, text:string}
+var importedCount = 0;               // how many days the imports brought across, THIS load
+var importedFrom = {legacy:0, water:0};  // …and how many of those from each source
+var stage = document.getElementById('stage');
+
+/** The day we are logging, recomputed from the clock on every call and NEVER
+    frozen at load. A tile left open across midnight used to keep writing to
+    yesterday's key while the stats walked off the new one; now the log card,
+    the chart's newest bar, the streak and the report all read the same anchor
+    or none of them do. `anchorKey` is only there to notice a rollover. */
+var anchorKey = todayKeyAt(new Date());
+function todayKey(){ return todayKeyAt(new Date()); }
+
+function days(){ return ownDays(store); }
+function byKey(){ var m={}; days().forEach(function(d){ m[d.key]=d; }); return m; }
+function dayFor(k){ return byKey()[k]||null; }
+function target(){ return targetFor(store); }
+
+/** What the import actually did, in the words the user needs: which source gave
+    how many days. Only ever called when something crossed. */
+function migratedCopy(){
+  var n=importedCount, l=importedFrom.legacy, w=importedFrom.water;
+  var tail=' They are part of your history now — today is the one you can change.';
+  if(l>0 && w>0){
+    return n+(n===1?' day':' days')+' brought across — '+l+' from the old Fuel stub'+
+      (l===1?'':'s')+' and '+w+' from the Water tile.'+tail;
+  }
+  if(l>0) return n+(n===1?' day':' days')+' brought across from the old Fuel stub.'+tail;
+  return n+(n===1?' day':' days')+' brought across from the Water tile.'+tail;
+}
+
+function renderLog(){
+  var lastKey=todayKey();
+  var rec=dayFor(lastKey);
+  var v=document.getElementById('lnVal');
+  if(rec){ v.textContent=String(rec.glasses); v.className='lnVal'; }
+  else { v.textContent='no entry'; v.className='lnVal none'; }
+  // Always the DAY in full, never "today" on its own: the day the user is
+  // logging is named so a tile left open overnight is never ambiguous about
+  // which key the number under it belongs to.
+  document.getElementById('lnLab').textContent=fmtGlasses(rec?rec.glasses:draft)+' on '+fmtLongDate(lastKey);
+  document.getElementById('stepVal').innerHTML=draft+'<small>glasses</small>';
+  document.getElementById('minus').disabled = draft <= GLASS_MIN;
+  document.getElementById('plus').disabled  = draft >= GLASS_MAX;
+  var btn=document.getElementById('save');
+  // Disabled only when there is nothing NEW to write. Deliberately NOT `!rec ||`
+  // — a day with no entry yet is the one case where saving is the whole point,
+  // and a `!rec` guard leaves the first day permanently unloggable. An absent
+  // day renders "no entry"; that is an absence, not a value Save should refuse.
+  btn.disabled = !!(rec && rec.glasses===draft);
+  btn.textContent = (rec ? 'Update ' : 'Save ')+fmtLongDate(lastKey);
+  var m=document.getElementById('saveMsg');
+  m.className='saveMsg'+(saveMsg?(saveMsg.ok?' ok':' bad'):'');
+  m.textContent=saveMsg?saveMsg.text:'';
+  // The import report, only when something really crossed. A chart that
+  // suddenly has a week of bars and no explanation is worse than no chart.
+  var mig=document.getElementById('migrated');
+  if(importedCount>0){
+    mig.hidden=false;
+    mig.textContent=migratedCopy();
+  }else{ mig.hidden=true; mig.textContent=''; }
+}
+
+function renderTarget(){
+  var t=target();
+  document.getElementById('tval').textContent=String(t);
+  document.getElementById('tminus').disabled = t <= TARGET_MIN;
+  document.getElementById('tplus').disabled  = t >= TARGET_MAX;
+}
+
+function renderSeg(){
+  var seg=document.getElementById('seg');
+  seg.innerHTML=WINDOWS.map(function(w,i){
+    return '<button type="button" class="segBtn" aria-current="'+(i===winIdx)+'" data-win="'+i+'">'+WINDOW_LABELS[i]+'</button>';
+  }).join('');
+}
+document.getElementById('seg').addEventListener('click',function(e){
+  var b=e.target.closest('[data-win]'); if(!b) return;
+  winIdx=Number(b.getAttribute('data-win'));
+  renderSeg(); renderAll();
 });
-if(!window.Vitality){window.Vitality={save:function(d){try{localStorage.setItem('v:prev:fuel',JSON.stringify(d));}catch(e){}return Promise.resolve(true);},load:function(){try{return Promise.resolve(JSON.parse(localStorage.getItem('v:prev:fuel')||'{}'));}catch(e){return Promise.resolve({});}}};}
-(async()=>{const d=await window.Vitality.load();store=(d&&typeof d==='object'&&!Array.isArray(d))?d:{};render();})();
+
+/* ── the chart: hand-rolled SVG, string-built, measured not guessed ──
+   Same technique as sleep.html — measure the container, build a viewBox that
+   matches it, concatenate the markup, and NO preserveAspectRatio="none". That
+   attribute stretches a viewBox to fill its box, which would squash the bars'
+   width as the tile resizes; with the viewBox width set to the measured width
+   the aspect already matches, so the default only ever kicks in as a letterbox. */
+function renderChart(){
+  var W=Math.max(260,Math.round(stage.clientWidth||320));
+  var H=168;
+  var PAD={top:14,right:6,bottom:22,left:30};
+  var innerW=W-PAD.left-PAD.right, innerH=H-PAD.top-PAD.bottom;
+  var geo={top:PAD.top,innerH:innerH};
+  var tgt=target();
+
+  var all=days();
+  // The window ENDS today, so the newest bar on the chart is the day the log
+  // card above is asking about: "7 days" means today and the 6 before it.
+  var lastKey=todayKey();
+  var keys=windowDates(lastKey,WINDOWS[winIdx],all.map(function(d){return d.key;}));
+  var by=byKey();
+  var inWin=keys.map(function(k){ return by[k]||{key:k,glasses:null}; });
+  var logged=inWin.filter(function(d){ return d.glasses!=null; });
+  var total=all.length;
+
+  var esc=function(s){ return String(s).replace(/[<>&"]/g,function(c){ return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]; }); };
+  var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'" role="img" aria-label="Glasses of water per day">';
+  s+='<defs><linearGradient id="wt-bar" x1="0" x2="0" y1="0" y2="1">'+
+     '<stop offset="0%" stop-color="'+ '#d4fce8' +'"/><stop offset="100%" stop-color="'+ '#6EE7B7' +' stop-opacity="0.28"/></linearGradient></defs>';
+
+  // The fixed 8/16/24 ladder, with the user's own target dashed on top of it.
+  // The target is the only line that changes; the domain never does.
+  tickList(tgt).forEach(function(g){
+    var y=yForGlasses(g,geo);
+    var isRef = g===tgt;
+    s+='<line x1="'+PAD.left+'" x2="'+(W-PAD.right)+'" y1="'+y.toFixed(1)+'" y2="'+y.toFixed(1)+'" '+
+       'stroke="var(--mint)" stroke-opacity="'+(isRef?0.55:0.13)+'" stroke-width="1" '+(isRef?'stroke-dasharray="4 4"':'')+'/>';
+    s+='<text x="'+(PAD.left-6)+'" y="'+(y+3.2).toFixed(1)+'" text-anchor="end" font-size="9" '+
+       'font-family="var(--font-mono)" fill="'+(isRef?'var(--mint)':'var(--muted)')+'" opacity="'+(isRef?1:0.75)+'">'+g+'g</text>';
+  });
+  s+='<line x1="'+PAD.left+'" x2="'+(W-PAD.right)+'" y1="'+baselineY(geo).toFixed(1)+'" y2="'+baselineY(geo).toFixed(1)+
+     '" stroke="var(--border-strong)" stroke-width="1"/>';
+
+  // bars
+  var g=barGeom(innerW,inWin.length);
+  var step=labelStep(g.pitch);
+  for(var i=0;i<inWin.length;i++){
+    var n=inWin[i];
+    var x=PAD.left+i*g.pitch+g.gap/2;
+    var title=fmtLongDate(n.key)+' — '+(n.glasses==null?'no entry':fmtGlasses(n.glasses));
+    if(n.glasses==null){
+      // an ABSENCE. A faint tick at the baseline, never a zero-height bar:
+      // "you didn't log it" and "you logged 0" are different facts.
+      s+='<rect x="'+x.toFixed(1)+'" y="'+(baselineY(geo)-3).toFixed(1)+'" width="'+g.w.toFixed(1)+
+         '" height="3" rx="1" fill="var(--border-strong)"><title>'+esc(title)+'</title></rect>';
+    }else{
+      var y=yForGlasses(n.glasses,geo);
+      var h=Math.max(2,baselineY(geo)-y);      // 0 still gets a visible 2px stub
+      var isLast=(n.key===lastKey);
+      s+='<rect class="barRise" x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+g.w.toFixed(1)+
+         '" height="'+h.toFixed(1)+'" rx="'+Math.min(2,g.w/2).toFixed(1)+'" fill="url(#wt-bar)" '+
+         'stroke="'+(isLast?'var(--mint)':'none')+'" stroke-width="'+(isLast?1.4:0)+'" '+
+         'style="animation-delay:'+(i*18)+'ms"><title>'+esc(title)+'</title></rect>';
+      if(n.glasses===0){
+        s+='<circle cx="'+(x+g.w/2).toFixed(1)+'" cy="'+(baselineY(geo)-6).toFixed(1)+'" r="1.6" fill="var(--mint)"/>';
+      }
+    }
+    // Every x label names the day, so the axis can never be read as anything
+    // other than a calendar day. The narrow form keeps the label from colliding.
+    if(i%step===0 || i===inWin.length-1){
+      s+='<text x="'+(x+g.w/2).toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" font-size="9" '+
+         'font-family="var(--font-mono)" fill="'+(n.key===lastKey?'var(--mint)':'var(--muted)')+'">'+
+         (n.key===lastKey?'today · ':'')+DAY_NAMES[parseKey(n.key).getDay()]+'</text>';
+    }
+  }
+  s+='</svg>';
+  stage.innerHTML=s;
+
+  // Honest degradation: the frame and the target line stay, and the empty
+  // state sits inside them. No placeholder bars, no invented baseline.
+  var note=document.getElementById('chartNote');
+  if(!note) { note=document.createElement('div'); note.id='chartNote'; stage.appendChild(note); }
+  if(logged.length===0){
+    note.className='empty';
+    note.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;pointer-events:none;padding:0 24px';
+    note.innerHTML='<span>'+(total?'nothing logged in this window':'nothing logged yet')+'</span>'+
+      '<span style="opacity:.7;text-transform:none;letter-spacing:.06em">'+
+      (total?'try a wider window':'log a day above and the bars appear here')+'</span>';
+  } else {
+    note.className=''; note.style.cssText='display:none'; note.innerHTML='';
+  }
+}
+
+/* All three views read ONE anchor, recomputed per call. The streak used to walk
+   off `new Date()` on every iteration while the log card was frozen at load, so
+   a tile left open across midnight counted a streak that started on a day the
+   card had already scrolled past. */
+function renderStats(){
+  var all=days();
+  var lastKey=todayKey();
+  var tgt=target();
+  var keys=windowDates(lastKey,WINDOWS[winIdx],all.map(function(d){return d.key;}));
+  var by=byKey();
+  var inWin=keys.map(function(k){ return by[k]||null; }).filter(Boolean);
+  var avg=avgGlasses(inWin);
+  var last=dayFor(lastKey);
+  var streak=dayStreak(by,lastKey);
+  var cell=function(label,val,unit,dim){
+    return '<div class="stat"><div class="statL">'+label+'</div><div class="statV'+(dim?' dim':'')+'">'+
+      val+(unit?'<em>'+unit+'</em>':'')+'</div></div>';
+  };
+  document.getElementById('stats').innerHTML=
+      cell('Today', last?String(last.glasses):'—', last?(last.glasses===1?'glass':'glasses'):'no entry', !last)
+    + cell('Average a day', avg==null?'—':avg.toFixed(1), avg==null?'':'glasses', avg==null)
+    + cell('Days logged', String(inWin.length), ' of '+keys.length)
+    + cell('At your target', String(daysAtTarget(inWin,tgt)), ' in window')
+    + cell('Consecutive days', streak>0?String(streak):'—', streak>0?'to date':'start one', streak===0);
+}
+
+/* ── report → the Mentor. Fire and forget, exactly as the bridge defines it.
+   Nothing consumes this yet (the host's handler is a no-op); it is here so the
+   seam is real and the payload already matches the contract. ── */
+function reportLatest(){
+  if(!BRIDGE || typeof BRIDGE.report!=='function') return;
+  // TODAY, not "the newest key in the store". A day with no entry is an
+  // absence, and the payload's `date` would otherwise claim a reading for a
+  // day the tile itself shows as "no entry".
+  var stream=reportStream(dayFor(todayKey()));
+  if(!stream) return;
+  try { BRIDGE.report(stream); } catch(e) { /* the channel is optional */ }
+}
+
+/* ── save the day. AWAITED, and the rejection handled.
+   Most other tiles wrap Vitality.save in try/catch WITHOUT awaiting it, which
+   cannot catch a rejected promise: the tile renders "saved" and the write was
+   dropped. Here the promise settles before the confirmation appears. ── */
+function persist(){
+  if(!BRIDGE || typeof BRIDGE.save!=='function'){
+    saveMsg={ok:false,text:'no bridge — nothing was written'};
+    renderLog(); return Promise.resolve(false);
+  }
+  // The key is resolved at SAVE time, not at load: a tile left open across
+  // midnight writes the day that actually just started.
+  var lastKey=todayKey();
+  store[lastKey]={glasses:normGlasses(draft)};
+  return BRIDGE.save(store).then(function(){
+    saveMsg={ok:true,text:'saved'};
+    renderAll(); reportLatest();
+    return true;
+  },function(err){
+    saveMsg={ok:false,text:(err&&err.message==='too_large_or_full')?'storage full — not saved':'could not save'};
+    renderLog();
+    return false;
+  });
+}
+
+/* ── save the TARGET, and nothing else. Its own awaited write, separate from
+   persist() on purpose: changing the target must never also write the day
+   draft, or nudging the target would create a day entry the user never
+   logged. Same store, same rejection handling, one fact per write. ── */
+function persistTarget(){
+  if(!BRIDGE || typeof BRIDGE.save!=='function'){
+    saveMsg={ok:false,text:'no bridge — nothing was written'};
+    renderLog(); return Promise.resolve(false);
+  }
+  store.target=target();
+  return BRIDGE.save(store).then(function(){
+    saveMsg={ok:true,text:'target saved'};
+    renderAll();
+    return true;
+  },function(err){
+    saveMsg={ok:false,text:(err&&err.message==='too_large_or_full')?'storage full — not saved':'could not save'};
+    renderLog();
+    return false;
+  });
+}
+
+document.getElementById('minus').addEventListener('click',function(){
+  draft=Math.max(GLASS_MIN,Math.round((draft-GLASS_STEP)/GLASS_STEP)*GLASS_STEP); renderLog();
+});
+document.getElementById('plus').addEventListener('click',function(){
+  draft=Math.min(GLASS_MAX,Math.round((draft+GLASS_STEP)/GLASS_STEP)*GLASS_STEP); renderLog();
+});
+document.getElementById('save').addEventListener('click',function(){ persist(); });
+document.getElementById('tminus').addEventListener('click',function(){
+  store.target=Math.max(TARGET_MIN,target()-1); persistTarget();
+});
+document.getElementById('tplus').addEventListener('click',function(){
+  store.target=Math.min(TARGET_MAX,target()+1); persistTarget();
+});
+
+/* One re-render for all three views, off ONE anchor. Anything that mutates the
+   store or the window goes through here, so the log card, the chart and the
+   stats can never be one render apart from each other. */
+function renderAll(){
+  anchorKey=todayKey();
+  renderLog(); renderTarget(); renderChart(); renderStats();
+}
+
+/* Midnight rollover. `todayKey()` is already recomputed on every read, so the
+   tile is never WRONG — but a tab left open would still show yesterday as
+   "today" until the user clicked something. This is the cheap part that keeps
+   the words honest with no interaction. Polling a clock is fine here; it is a
+   dozen localStorage-free string comparisons a minute. */
+setInterval(function(){ if(todayKey()!==anchorKey) renderAll(); },30000);
+document.addEventListener('visibilitychange',function(){
+  if(!document.hidden && todayKey()!==anchorKey) renderAll();
+});
+
+/* ── boot ── */
+function spawnMotes(){
+  var atmo=document.getElementById('atmo');
+  for(var i=0;i<12;i++){
+    var m=document.createElement('div'); m.className='mote';
+    m.style.left=((i*67+13)%100)+'%';
+    m.style.top=(40+((i*29)%55))+'%';
+    m.style.animationDuration=(9+((i*7)%9))+'s';
+    m.style.animationDelay='-'+((i*1.3)%9)+'s';
+    atmo.appendChild(m);
+  }
+}
+
+function boot(){
+  document.getElementById('heroDate').textContent=fmtLongDate(todayKey()).toUpperCase();
+  renderSeg(); spawnMotes();
+  if(!BRIDGE){
+    store={};
+    renderAll();
+    return;
+  }
+  BRIDGE.load().then(function(d){
+    store=(d&&typeof d==='object'&&!Array.isArray(d))?d:{};
+    // Import whenever the other two sources are READABLE, not "when our store is
+    // empty". That gate was the whole bug in the Sleep tile's own import: one
+    // hand-logged day, or one 8-second read timeout on the tile's first open,
+    // disabled the import PERMANENTLY and the history never crossed. The trigger
+    // is now what is MISSING — mergeFuelHistory skips every day this tile already
+    // holds, so a re-run imports only new history, never a duplicate, never a day
+    // the user logged by hand, and a dropped import save just means the next load
+    // picks the same days up.
+    // Both sources are read-only: the bridge has no cross-tile write, which is
+    // the whole reason Fuel can be the one home for this number.
+    if(typeof BRIDGE.read!=='function'){ merge(null); return; }
+    return BRIDGE.read('water').then(function(w){ merge(w); },function(){ merge(null); });
+  },function(){
+    // A load that failed is NOT an empty store: it says nothing about what the
+    // user logged, so the tile renders its empty state and the save button is
+    // the only thing that writes. Nothing is inferred from the failure.
+    store={};
+    renderAll();
+  });
+
+  function merge(waterSlot){
+    // The legacy `water` object is read out of OUR OWN loaded store, so the
+    // Fuel migration runs even when the host will not answer a cross-tile read.
+    var r=mergeFuelHistory(store,waterSlot);
+    if(r.imported>0){
+      store=r.days;
+      importedCount=r.imported;
+      importedFrom={legacy:r.legacy,water:r.water};
+      // Persist the import so the copy is owned from here on. A failure here is
+      // not fatal and not a "migration done" flag: nothing is lost, the same
+      // merge runs again on the next open and lands the same days.
+      return BRIDGE.save(store).then(function(){ after(); },function(){ after(); });
+    }
+    after();
+  }
+  function after(){
+    var rec=dayFor(todayKey());
+    if(rec) draft=rec.glasses;
+    renderAll(); reportLatest();
+  }
+}
+
+if(window.ResizeObserver){ new ResizeObserver(function(){ renderChart(); }).observe(stage); }
+else { window.addEventListener('resize', renderChart); }
+boot();
 </script>
 </body>
 </html>

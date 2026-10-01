@@ -250,7 +250,7 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
 
                   <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>Weights per tile (%):</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {['train', 'fuel', 'vitals', 'sleep', 'screen', 'water', 'peak', 'finance'].map((tileKey) => {
+                    {['train', 'fuel', 'vitals', 'sleep', 'screen', 'peak', 'finance'].map((tileKey) => {
                       const weightVal = currentGoal.weights?.[tileKey] ?? 0
                       return (
                         <div key={tileKey} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>

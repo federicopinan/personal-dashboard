@@ -16,7 +16,7 @@
  * only make boxy 2-wide bars. Each preset resolves to a column/row span; the
  * grid CSS reads data-size and the spans drive a future free-resize handle.
  *
- *   s    1x1  utility (Vitals, Water)
+ *   s    1x1  utility (Vitals)
  *   m    2x1  standard band
  *   tall 1x2  vertical accent (old Fuel / Peak / Brand)
  *   hero 3x1  the hero (old Train)

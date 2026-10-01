@@ -158,7 +158,15 @@ export default function MentorPage({
 
   const act = list.find((g) => g.id === active) ?? list[0]
   const accent = act?.accent ?? '#6EE7B7'
-  const entries = Object.entries(act?.weights ?? {}).sort((a, b) => b[1] - a[1])
+  // A weight the board cannot show is not part of the equation. A goal saved
+  // while a tile existed keeps that tile's key forever (withShippedWeights only
+  // fills absent keys, it never strips present ones), so a retired id would
+  // otherwise render a row for a tile that is not on the board. Filtered here
+  // rather than by rewriting the user's file: a stale key on disk is harmless,
+  // a phantom term in the equation is not.
+  const entries = Object.entries(act?.weights ?? {})
+    .filter(([tile]) => tile in CORE_TILES)
+    .sort((a, b) => b[1] - a[1])
   const advice = noticedFeed()[0]
 
   // Announce on the bus after every write, not just the delete: the board's
