@@ -348,6 +348,9 @@ function labelStep(pitch){
 function fmtHours(h){
   if(h==null) return '—';
   var hh=Math.floor(h),mm=Math.round((h-hh)*60);
+  // The window average is not on the 0.5h stepper grid, so the rounded minutes
+  // can land on 60 (h=7.999 -> "7h 60m"). Carry it, or print 8h.
+  if(mm===60){ hh+=1; mm=0; }
   return hh+'h'+(mm?' '+mm+'m':'');
 }
 function fmtLong(key){
@@ -411,7 +414,11 @@ function renderLog(){
   document.getElementById('minus').disabled = draft <= HOURS_MIN;
   document.getElementById('plus').disabled  = draft >= HOURS_MAX;
   var btn=document.getElementById('save');
-  btn.disabled = !rec || rec.hours===draft;
+  // Disabled only when the stored value ALREADY equals the draft. A day with
+  // no record has no stored value, so the draft is a change and Save must be
+  // live — the earlier `!rec ||` form disabled it forever, which made logging
+  // the first night of every day impossible.
+  btn.disabled = !!(rec && rec.hours===draft);
   btn.textContent = (rec ? 'Update ' : 'Save ')+fmtLongDate(lastKey);
   var m=document.getElementById('saveMsg');
   m.className='saveMsg'+(saveMsg?(saveMsg.ok?' ok':' bad'):'');
