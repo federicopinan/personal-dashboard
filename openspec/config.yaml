@@ -1,5 +1,9 @@
 schema: spec-driven
 
+# Engram is the canonical store for new and continuing SDD artifacts.
+# Existing OpenSpec files remain preserved as project history and are not the active artifact store.
+artifactStore: engram
+
 context: |
   Tech stack: Next.js 14 (App Router) + React 18 + TypeScript + vanilla CSS,
   with three.js for the header gem.
