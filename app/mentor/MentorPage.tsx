@@ -8,7 +8,7 @@ import {
   allGoals,
   activeGoalId,
   setActiveGoalId,
-  goals,
+  storedGoals,
   saveGoals,
   noticedFeed,
   tileIdeas,
@@ -120,7 +120,10 @@ export default function MentorPage({
     const raw = draft.trim()
     if (!raw) return
     const id = 'g-' + raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 24)
-    saveGoals([...goals(), { id, title: raw, weights: {}, pending: true } as Goal])
+    // storedGoals(), not goals(): this is a WRITE, and goals() fills in weights
+    // the saved file is missing for display only. Re-saving the list through it
+    // would persist a weight the user never chose.
+    saveGoals([...storedGoals(), { id, title: raw, weights: {}, pending: true } as Goal])
     setList(allGoals())
     setDraft('')
   }

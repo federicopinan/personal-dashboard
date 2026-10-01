@@ -11,7 +11,7 @@ Tone: warm, plain-language. Explain what you're doing in a sentence, do it, then
 ## What "the full dashboard" is
 
 The complete set of ready-made tiles ships bundled with this project in the **`tiles-library/`** folder
-(Train, Fuel, Vitals, Vee, Peak, Finance). Installing = copying them into `public/tiles/`, which
+(Train, Fuel, Vitals, Sleep, Vee, Peak, Finance). Installing = copying them into `public/tiles/`, which
 is the folder the board reads. A fresh board is blank because that folder starts empty; this fills it.
 
 The dashboard is local-only — every tile's saved data lives in the browser's localStorage through
@@ -34,7 +34,11 @@ instead — same result:
 npx --yes degit RowanThistlebrooke/vitality-base/tiles-library public/tiles --force
 ```
 
-Then confirm what landed: `ls public/tiles` should list the six `.html` tiles.
+Then confirm what landed: `ls public/tiles` should list the seven `.html` tiles.
+
+**If they already have tiles**, this copy OVERWRITES `public/tiles/<slot>.html` with the bundled
+version. Say so before running it, and only copy the slots they actually want replaced
+(`cp tiles-library/<slot>.html public/tiles/<slot>.html`) — a blanket copy reverts local tile edits.
 
 ## Step 2 — Look at it
 
@@ -47,8 +51,9 @@ a tile opens the real thing.
 Say it plainly: this is a starting point, not a cage.
 - **Don't want a tile?** Delete its file in `public/tiles/` (e.g. `rm public/tiles/finance.html`) and it
   disappears from the board on reload.
-- **Want to change one?** Rebuild it your way with `/tile <slot>` (slots: `train, fuel, vitals, vee,
-  peak, finance`), or just ask me to edit `public/tiles/<slot>.html`.
+- **Want to change one?** Rebuild it your way with `/tile <slot>` (slots: `train, fuel, vitals, sleep,
+  vee, peak, finance`), or just ask me to edit `public/tiles/<slot>.html`. If you edit it there, copy
+  the change back with `cp public/tiles/<slot>.html tiles-library/` so the next install keeps it.
 
 ## Step 4 — Put it live (if their dashboard is already on GitHub)
 

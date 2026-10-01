@@ -24,6 +24,7 @@ export type CoreTileId =
   | 'train'
   | 'fuel'
   | 'vitals'
+  | 'sleep'
   | 'peak'
   | 'finance'
 
@@ -120,6 +121,29 @@ export const CORE_TILES: Record<CoreTileId, CoreTile> = {
       <svg className="art" viewBox="0 0 210 118">
         <path className="mot" d="M38 47 L74 47 L89 27 L104 70 L119 47 L172 47" />
         <g className="orb"><circle className="glow" r="8" /><circle className="node" r="3.2" /></g>
+      </svg>
+    ),
+  },
+  sleep: {
+    id: 'sleep',
+    href: '/app/starter',
+    index: '07',
+    label: 'Sleep',
+    // The orb drifts the moon's ring, then settles onto the pillow line below.
+    // Both are .mot/.motd paths so 'wander' walks them and swaps between the
+    // two — a night that never quite holds still, which is the whole idea.
+    orb: { mode: 'wander' },
+    defaultSize: 'm',
+    glyph: (
+      <svg viewBox="-12 -12 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M-1.5 -5.6 A9 9 0 1 1 -6.4 -10.5 A7 7 0 0 0 -1.5 -5.6 Z" />
+      </svg>
+    ),
+    art: (
+      <svg className="art" viewBox="0 0 210 250">
+        <path className="mot" d="M105 62 a50 50 0 1 1 -0.1 0" />
+        <path className="motd" d="M34 182 Q105 164 176 182" />
+        <g className="orb"><circle className="glow" r="10" /><circle className="node" r="3.4" /></g>
       </svg>
     ),
   },
@@ -225,14 +249,20 @@ export type HomeTileId = CoreTileId | 'vee' | 'library'
  * dense auto-flow: Train the wide hero up top, Fuel a tall on the right, Library a
  * 2-wide band high in the second row (the always-on "your apps" shelf, the
  * platform's front door; building and uploading tiles live inside it), Vee the
- * 2x2 centre, talls down the sides, Finance a 2-wide band at the foot. Every tile
- * drags, resizes, and can be removed. User-built tiles append.
+ * 2x2 centre, talls down the sides, Finance a 2-wide band at the foot. Sleep
+ * sits beside Vitals because it feeds it. Every tile drags, resizes, and can be
+ * removed. User-built tiles append.
+ *
+ * Adding a tile here is SAFE for existing boards: DashboardGrid seeds its order
+ * from this list only when `vitality:eq:order` is empty, and a saved order
+ * always gets anything missing from this list appended rather than dropped.
  */
 export const DEFAULT_HOME_ORDER: HomeTileId[] = [
   'train',
   'fuel',
   'library',
   'vitals',
+  'sleep',
   'vee',
   'peak',
   'finance',

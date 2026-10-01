@@ -85,16 +85,33 @@ Episode 2) wins outright; otherwise it's the two bone-simple manual inputs:
     whoopRecovery present → round(whoopRecovery)          (a device wins)
     else, weighted average of what exists:
       feel   present → clamp(0..100, feel)                weight 0.6
-      sleep  present → clamp01(sleepHours / 8) · 100       weight 0.4
+      sleep  present → clamp01(hours / 8) · 100            weight 0.4
 
     recovery = round( Σ(partᵢ · wᵢ) / Σ wᵢ ),  clamped to 1..99
 
 `feel` is the 0–100 value behind the Vitals feel chips (Wrecked 25 … Great 95).
+`sleep` is the night's hours, and it is **no longer read off the vitals record**:
+the `sleepHours` field has been retired. The Sleep tile owns hours in its own
+store, so the formula takes them as a SECOND argument — the lookup moved to the
+call site, the maths did not change.
+
+**The night is the key.** A night is stored under the day it *began*: the night
+of Tuesday is `2026-09-30`, typed on Wednesday morning. A vitals record under
+`k` was logged on the morning of `k` and is about the night of `k − 1 day`, so
+every reader resolves "last night's sleep" as `todayKey − 1 day`. The retired
+`sleepHours` field used the *logging* day, and Sleep's migration shifts each
+legacy key back one night on import. Get this backwards and the two stores can
+never agree, which silently deletes the sleep half of every recovery number.
+
+A missing night is an absence, not a zero, and is left out of the weighted
+average entirely (the `sw` normaliser handles the missing term).
+
 Peak then scales its whole curve by `k = 0.55 + (recovery/100)·0.65`. The
-canonical source is `estRecovery` in `tiles-library/vitals.html`; the verbatim
-copy is `recoveryFromVitals` in `peak.html`. Change one, change all three
-(both tiles + this doc + the on-tile derivation). Never round differently or
-add a term — matching is the whole point.
+canonical source is `estRecovery` in `public/tiles/vitals.html`; the verbatim
+copy is `recoveryFromVitals` in `public/tiles/peak.html`. (`tiles-library/` is
+what `/vitality` installs from — a copy of these, not the origin.) Change one,
+change all three (both tiles + this doc + the on-tile derivation). Never round
+differently or add a term — matching is the whole point.
 
 ## House rules
 

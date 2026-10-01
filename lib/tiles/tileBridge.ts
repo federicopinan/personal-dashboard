@@ -32,12 +32,20 @@ const SHIM = `<script>
       var msg = { source: 'vitality-tile', type: type, id: id };
       if (extra) for (var k in extra) msg[k] = extra[k];
       parent.postMessage(msg, '*');
-      // backstop: never let a tile hang if a reply is somehow lost.
+      // Backstop: never let a tile hang if a reply is somehow lost. What it
+      // settles with is the honest answer for each lane. A 'load' resolves []
+      // because the host genuinely sends [] for a never-written slot and
+      // changing that would break every tile's "no data yet" path. A 'read' used
+      // to resolve null here too, and a null read is indistinguishable from a
+      // real read of a slot the host has nothing for, so a tile had to render
+      // a failed read as a fact. It now REJECTS, so a read that never arrived
+      // can be told apart from one that arrived empty; the tiles that read
+      // (vitals, peak, sleep) already catch and fall back.
       setTimeout(function () {
         if (!pending[id]) return;
         delete pending[id];
         if (type === 'load') resolve([]);
-        else if (type === 'read') resolve(null);
+        else if (type === 'read') reject(new Error('vitality_timeout'));
         else reject(new Error('vitality_timeout'));
       }, 8000);
     });

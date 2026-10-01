@@ -18,8 +18,11 @@
   lifts off the dotted baseline in real time. Plugs into your saved data through the
   dashboard bridge (window.Vitality).
   HARDWIRED TO VITALS: on boot it reads the vitals tile (BRIDGE.read('vitals'))
-  and derives today's recovery with the SAME formula vitals uses (estRecovery),
-  so poor sleep reshapes the curve on the next refresh — no /sweep, no connector.
+  and the sleep tile that owns the hours (BRIDGE.read('sleep')), then derives
+  recovery with the SAME formula vitals uses (estRecovery), so poor
+  sleep reshapes the curve on the next refresh — no /sweep, no connector.
+  The day plotted is TODAY's vitals record when there is one, else the most
+  recent one, and the hours come from the NIGHT that record was logged on.
   HONEST GATE: the curve + ring only draw once real signal feeds them (a recovery
   from Vitals, a caffeine log, a planned event, or a feel drag). Until then they
   show "not enough data to build" — the stack cards and plan console stay live
@@ -457,16 +460,79 @@ const BRIDGE=(typeof window!=='undefined'&&window.Vitality&&typeof window.Vitali
 /* The vitals tile's EXACT recovery formula, copied verbatim so this hardwired
    read and the mentor's /sweep produce an IDENTICAL number — never a flip-flop.
    whoopRecovery (a device, Episode 2) wins; else the two manual inputs.
-   Change it here → change vitals.html estRecovery + docs/THE-MATH.md too. */
-function recoveryFromVitals(h){
+   Change it here → change vitals.html estRecovery + docs/THE-MATH.md too.
+   The night's hours arrive as a SECOND argument rather than being read off `h`:
+   sleepHours is no longer stored on the vitals record, because the Sleep tile
+   owns it now (see vitals.html hoursFor). The maths below is otherwise
+   character-for-character identical — only the lookup moved to the call site,
+   so the two copies of the FORMULA can never drift. */
+function recoveryFromVitals(h,sh){
   if(!h) return null;
   if(typeof h.whoopRecovery==='number') return Math.max(1,Math.min(99,Math.round(h.whoopRecovery)));
   const c=x=>Math.max(0,Math.min(1,x)),parts=[],w=[];
   if(typeof h.feel==='number'){ parts.push(Math.max(0,Math.min(100,h.feel))); w.push(0.6); }
-  if(typeof h.sleepHours==='number'){ parts.push(c(h.sleepHours/8)*100); w.push(0.4); }
+  if(typeof sh==='number'&&isFinite(sh)){ parts.push(c(sh/8)*100); w.push(0.4); }
   if(!parts.length) return null;
   const sw=w.reduce((a,b)=>a+b,0); let s=0; for(let i=0;i<parts.length;i++)s+=parts[i]*w[i];
   return Math.max(1,Math.min(99,Math.round(s/sw)));
+}
+
+/* ── the night convention, and the only place it is decided here ──
+   A night is keyed by the day it BEGAN. Local fields only, and setDate rather
+   than +86400000: a 23h or 25h DST day would otherwise skip or repeat a night.
+   Local copies rather than a shared import — a tile is ONE sealed
+   self-contained file with no imports and no network, so there is nowhere to
+   share from. Mirrors: sleep.html PURE block, vitals.html. Change one, change all. */
+function dateKey(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function parseKey(k){
+  const p=String(k).split('-');
+  return new Date(Number(p[0]),Number(p[1])-1,Number(p[2]));
+}
+function shiftKey(k,n){
+  const d=parseKey(k);
+  d.setDate(d.getDate()+n);
+  return dateKey(d);
+}
+/** Last night's key: the night that ENDED this morning, today - 1 day. */
+function lastNightKeyAt(now){
+  const d=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  d.setDate(d.getDate()-1);
+  return dateKey(d);
+}
+/** The night BEFORE the morning a record was typed on. The legacy vitals store
+    keyed sleepHours by the logging day; the sleep store keys it by the night. */
+function nightKeyBefore(logKey){ return shiftKey(logKey,-1); }
+/** The morning a night's hours get typed. */
+function nightKeyAfter(nightKey){ return shiftKey(nightKey,1); }
+
+/** Hours for a NIGHT key, asked of the store that keys by night (sleep), then
+    of the vitals record logged on the morning AFTER that night. Two lookups,
+    one fact. */
+function nightHours(sl,v,nk){
+  const s=sl&&typeof sl==='object'?sl[nk]:null;
+  if(s&&typeof s.hours==='number'&&isFinite(s.hours))return s.hours;
+  const r=v&&typeof v==='object'?v[nightKeyAfter(nk)]:null;
+  if(r&&typeof r.sleepHours==='number'&&isFinite(r.sleepHours))return r.sleepHours;
+  return null;
+}
+
+/** The recovery this tile plots, from the two stores it reads.
+    THE DAY CHOSEN MUST COME FROM VITALS ALONE. The sleep store is a different
+    set of keys (nights, not mornings), so unioning the two key sets and taking
+    the newest could pick a key vitals has no record for — recoveryFromVitals
+    returns null for a missing record, the number vanishes, and hasSignal()
+    then takes the whole curve and ring down with it. Vitals keys are the only
+    ones that can carry a recovery, so only they are candidates; sleep only ever
+    SUPPLIES the hours. Today's record wins when it exists, otherwise the most
+    recent vitals record — which is the pre-move behaviour, unchanged. */
+function recoveryForVitals(v,sl,tk){
+  if(!v||typeof v!=='object'||Array.isArray(v))return null;
+  const vDays=Object.keys(v).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
+  if(!vDays.length)return null;
+  const useKey=v[tk]?tk:vDays[vDays.length-1];
+  return recoveryFromVitals(v[useKey],nightHours(sl,v,nightKeyBefore(useKey)));
 }
 async function boot(){
   if(BRIDGE){try{
@@ -484,16 +550,24 @@ async function boot(){
   // with the shared formula, so poor sleep reshapes the curve on the very next
   // refresh — no /sweep, no connector. (The mentor's sweep writes the same
   // number via the same formula, so the two never disagree.)
+  //
+  // The sleep hours come from the SLEEP tile, which owns them, and fall back to
+  // a legacy sleepHours still sitting on the vitals record. Without the second
+  // read, moving sleepHours out of vitals would have silently deleted the sleep
+  // half of every recovery number this tile computes. Both are keyed by the
+  // NIGHT (see recoveryForVitals), so the two stores can be compared.
+  // A failed read is NOT the same as an empty one, and neither is fatal: null
+  // on either side just means that half of the lookup falls through to the other.
   try{
     if(BRIDGE&&typeof BRIDGE.read==='function'){
-      const v=await BRIDGE.read('vitals');
-      if(v&&typeof v==='object'&&!Array.isArray(v)){
-        const nd=new Date(),tk=nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0')+'-'+String(nd.getDate()).padStart(2,'0');
-        const days=Object.keys(v).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
-        const useKey=v[tk]?tk:days[days.length-1];
-        const rec=useKey?recoveryFromVitals(v[useKey]):null;
-        if(typeof rec==='number')D.whoop=Object.assign({},D.whoop,{recovery:rec});
-      }
+      const [v,sleep]=await Promise.all([
+        BRIDGE.read('vitals').catch(()=>null),
+        BRIDGE.read('sleep').catch(()=>null),
+      ]);
+      const sl=(sleep&&typeof sleep==='object'&&!Array.isArray(sleep))?sleep:null;
+      const nd=new Date();
+      const rec=recoveryForVitals(v,sl,dateKey(nd));
+      if(typeof rec==='number')D.whoop=Object.assign({},D.whoop,{recovery:rec});
     }
   }catch(e){}
   const d=new Date();

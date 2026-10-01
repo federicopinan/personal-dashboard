@@ -17,8 +17,8 @@ shows the "how to build this" panel instead.
 | `train`  | Train    | `public/tiles/train.html`  |
 | `fuel`   | Fuel     | `public/tiles/fuel.html`   |
 | `vitals` | Vitals   | `public/tiles/vitals.html` |
+| `sleep`  | Sleep    | `public/tiles/sleep.html`  |
 | `vee`    | Vee      | `public/tiles/vee.html`    |
-
 | `peak`   | Peak     | `public/tiles/peak.html`   |
 | `finance`| Finance  | `public/tiles/finance.html`|
 
@@ -52,3 +52,22 @@ device.
    Claude Code to "build a `<slot>` tile and save it to `public/tiles/<slot>.html`".
 
 Then commit + redeploy (or reload locally) and the tile appears on your dashboard.
+
+## Keeping `tiles-library/` in step
+
+`tiles-library/` is what `/vitality` copies INTO `public/tiles/`, so it is a copy
+OF the tiles, not the origin. After editing a tile in `public/tiles/`, copy it
+back so a fresh install does not overwrite your change with an older one:
+
+```bash
+cp public/tiles/<slot>.html tiles-library/
+```
+
+### Sleep is keyed by the night
+
+`sleep.html` owns the hours. A night is stored under the day it **began** — the
+night of Tuesday is `2026-09-30`, even though you type it on Wednesday morning.
+Any tile reading the hours must look back one night from the day it is
+displaying. `vitals.html` and `peak.html` both do this; the date helpers are
+copied into each file on purpose, because a tile is one sealed file with no
+imports and no network, so there is nowhere to share them from.

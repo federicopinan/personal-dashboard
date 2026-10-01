@@ -52,21 +52,21 @@ export const DEFAULT_GOALS: Goal[] = [
     id: 'soc-analyst',
     title: 'SOC Blue Team analyst',
     accent: '#00D4FF',
-    weights: { train: 5, fuel: 5, vitals: 25, peak: 5, finance: 60 },
+    weights: { train: 4, fuel: 4, vitals: 20, sleep: 12, peak: 5, finance: 55 },
     progress: 5,
   },
   {
     id: 'jacked',
     title: 'Get jacked',
     accent: '#FF6B6B',
-    weights: { train: 50, fuel: 30, vitals: 15, peak: 5 },
+    weights: { train: 45, fuel: 26, vitals: 12, sleep: 12, peak: 5 },
     progress: 10,
   },
   {
     id: 'trader',
     title: 'Professional trader',
     accent: '#FFD700',
-    weights: { train: 5, fuel: 5, vitals: 10, peak: 5, finance: 75 },
+    weights: { train: 4, fuel: 4, vitals: 8, sleep: 7, peak: 5, finance: 72 },
     progress: 5,
   },
 ]
@@ -77,9 +77,13 @@ export const OVERALL_GOAL: Goal = {
   id: 'overall',
   title: "A SOC analyst who's jacked and trades",
   accent: '#00D4FF',
-  weights: { train: 20, fuel: 10, vitals: 20, peak: 5, finance: 45 },
+  weights: { train: 17, fuel: 9, vitals: 16, sleep: 10, peak: 5, finance: 43 },
   progress: 5,
 }
+
+/** Every tile that ships with a weight in the defaults. A saved goal that
+ *  predates one of these gets the shipped value back — see withShippedWeights. */
+const SHIPPED_TILE_KEYS: string[] = Object.keys(OVERALL_GOAL.weights)
 
 /** Overall first, then the individual goals. */
 export function allGoals(): Goal[] {
@@ -122,14 +126,9 @@ export interface TileIdea {
 }
 
 export const DEFAULT_IDEAS: Record<string, TileIdea[]> = {
+  // No Sleep idea here any more: the Sleep tile ships with the board, so
+  // suggesting it would be the mentor asking for something you already have.
   overall: [
-    {
-      word: 'Sleep',
-      title: 'Sleep consistency',
-      tracks: 'bedtime variance, night by night',
-      why: 'Recovery is everything when you\'re grinding SOC by day, trading by night, and chasing gains.',
-      estWeight: 8,
-    },
     {
       word: 'Screen',
       title: 'Screen time',
@@ -230,8 +229,82 @@ export function saveGoals(list: Goal[]): void {
   }
 }
 
-/** All goals: localStorage override ('vitality:goals') if valid, else defaults. */
-export function goals(): Goal[] {
+/**
+ * The shipped weight for one tile, as a last resort for a goal that is missing
+ * the key. Read from DEFAULT_GOALS/OVERALL_GOAL by goal id, so the number comes
+ * from the same table the defaults do — never invented here.
+ */
+function shippedWeight(goalId: string, tileKey: string): number | undefined {
+  const from = (g?: Goal) => (g && g.weights && tileKey in g.weights ? g.weights[tileKey] : undefined)
+  const inDefaults = DEFAULT_GOALS.find((g) => g.id === goalId)
+  return from(inDefaults) ?? (OVERALL_GOAL.id === goalId ? from(OVERALL_GOAL) : undefined)
+}
+
+/**
+ * Fill in the weights a saved goal predates, WITHOUT touching the stored object.
+ *
+ * A goal saved before a tile existed has no key for it, and `weights.sleep ?? 0`
+ * then renders a 0% badge on that tile and starts the settings slider at 0 — the
+ * tile reads as broken to exactly the people with the most data behind it.
+ *
+ * Read path, not a migration, on purpose. Writing back would mutate the user's
+ * own saved file, which the mentor, /sweep or a second tab may also be editing;
+ * a one-time marker would need its own key, would silently drop a weight if it
+ * ever ran twice, and could not repair a goal cleared after it ran. This runs
+ * on every read instead, costs one object build, and the file on disk is never
+ * written — the fallback only ever applies to keys that are ABSENT.
+ *
+ * A weight the user DID set is never touched, including an explicit 0:
+ * `typeof x === 'number'` is the test, so 0 stays 0 and only a missing key is
+ * filled. A stored weight that is not a number is not a setting either, and is
+ * treated as absent.
+ */
+function withShippedWeights(goal: Goal): Goal {
+  const w = goal.weights as Record<string, unknown>
+  if (!w || typeof w !== 'object') return goal
+  // A stored value is kept only if it is a real number. `train: 'lots'` is not
+  // a setting, and rendering it as a badge is worse than falling back.
+  const fill: Record<string, number> = {}
+  for (const [tileKey, value] of Object.entries(w)) {
+    if (typeof value === 'number' && Number.isFinite(value)) fill[tileKey] = value
+  }
+  // A goal's own key set is the source of truth for what it tracks, so a brand
+  // new goal (`weights: {}`, still pending) is left empty. Only a goal that
+  // already carries weights gets the shipped values back — that is the
+  // pre-move signature, and it is what separates "saved before Sleep existed"
+  // from "freshly created, nothing chosen yet".
+  if (Object.keys(fill).length === 0) return goal
+  let added = 0
+  for (const key of SHIPPED_TILE_KEYS) {
+    if (key in fill) continue // the user set it, even if they set it to 0
+    const fallback = shippedWeight(goal.id, key)
+    if (typeof fallback === 'number') {
+      fill[key] = fallback
+      added++
+    }
+  }
+  // Nothing absent and nothing corrupt: hand back the very same object, so a
+  // fully-specified goal does not churn its identity on every render.
+  if (added === 0 && Object.keys(fill).length === Object.keys(w).length) return goal
+  return { ...goal, weights: fill }
+}
+
+/**
+ * Every goal with its absent weights filled in from the shipped defaults.
+ * `goals()` is the single read path for the whole app (badges, the Mentor
+ * breakdown, the settings sliders), so doing it there fixes all of them.
+ */
+function normaliseGoals(list: Goal[]): Goal[] {
+  return list.map(withShippedWeights)
+}
+
+/**
+ * The goals EXACTLY as stored, with no read-path fill. Any WRITE path must use
+ * this, so re-saving the list cannot quietly bake a filled-in weight into the
+ * user's file — a weight they never chose would become indistinguishable from
+ * one they did.
+ */
+export function storedGoals(): Goal[] {
   if (typeof window !== 'undefined') {
     try {
       const raw = window.localStorage.getItem('vitality:goals')
@@ -244,6 +317,12 @@ export function goals(): Goal[] {
     }
   }
   return DEFAULT_GOALS
+}
+
+/** All goals: localStorage override ('vitality:goals') if valid, else defaults,
+ *  with any weight a saved goal predates filled in from the shipped defaults. */
+export function goals(): Goal[] {
+  return normaliseGoals(storedGoals())
 }
 
 /** The active goal id (persisted). Defaults to the first goal. */

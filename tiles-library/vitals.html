@@ -11,10 +11,24 @@
   real connection). The 7-day line scales your inputs over time.
 
   Sealed: no network. Saves through window.Vitality.
-  Store: { 'YYYY-MM-DD': { sleepHours, feel, whoopRecovery? } }
+  Store: { 'YYYY-MM-DD': { feel, whoopRecovery? } }
   Recovery: whoopRecovery wins when a device fills it; else 0.6·feel + 0.4·sleep.
   The SAME formula lives in peak.html (recoveryFromVitals) + docs/THE-MATH.md §5
   + /sweep — change one, change all, so Peak never disagrees.
+
+  SLEEP IS NOT OURS ANY MORE (one owner, one number). Hours are logged and owned
+  by the Sleep tile; Vitals reads them back with Vitality.read('sleep') and shows
+  them. Two writers for one number is how a copy goes stale, and there is no
+  cross-tile WRITE in the bridge, so the direction is fixed: Sleep owns, Vitals
+  reads. Old records that still carry sleepHours are still read exactly as they
+  were, so pre-move history never blanks out.
+
+  THE NIGHT IS THE KEY. The Sleep store keys a night by the day it BEGAN, so a
+  Vitals record logged on the morning of k is about the night of k - 1 day, and
+  hoursFor() asks the Sleep store for THAT key. Vitals' own legacy sleepHours
+  stays keyed by k, which is what it always was. Local copies of the four date
+  helpers rather than a shared import: a tile is one sealed self-contained file
+  with no network, so there is nowhere to share from. Change one, change all.
 -->
 <style>
   :root{
@@ -65,10 +79,11 @@
   .card{margin-top:26px;border:1px solid var(--border);border-radius:16px;background:rgba(14,14,17,.5);padding:20px 18px}
   .q{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted-strong);margin-bottom:12px}
   .q2{margin-top:22px}
-  .sleepRow{display:flex;align-items:center;justify-content:center;gap:18px}
-  .step{width:44px;height:44px;border-radius:999px;border:1px solid var(--border-strong);background:transparent;color:var(--muted);font-size:22px;cursor:pointer;transition:all .15s;font-family:inherit}
-  .step:hover{color:#fff;border-color:var(--muted)}
-  .sleepVal{font-family:var(--serif);font-style:italic;font-size:34px;color:#fff;min-width:120px;text-align:center}
+  .sleepNote{margin-top:20px;padding:13px 15px;border:1px solid var(--border);border-radius:12px;background:rgba(14,14,17,.35);display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .sleepNoteL{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .sleepNoteV{font-family:var(--serif);font-style:italic;font-size:22px;color:#fff;line-height:1}
+  .sleepNoteV.none{color:var(--muted);font-size:15px}
+  .sleepNoteA{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand);opacity:.85}
   .feelRow{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
   .feel{padding:12px 4px;border-radius:11px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}
   .feel:hover{color:#fff;border-color:var(--muted)}
@@ -88,34 +103,93 @@
 </head>
 <body>
 <div class="shell">
-<div class="starterTag">✦ starter — the value is what you build · the videos show how</div>
+<div class="starterTag">✦ starter — personal tile · click to log or edit</div>
   <h1>Vitals</h1>
   <div id="app"></div>
 </div>
 <script>
 const FEEL=[['Wrecked',25],['Rough',45],['OK',65],['Good',82],['Great',95]];
 let store={};
-let draft={sleepHours:7.5,feel:null};
+/* The Sleep tile's nights, read once at boot: { 'YYYY-MM-DD': {hours} }. */
+let sleepStore={};
+let draft={feel:null};
+let sleepState='loading'; // loading | ready | unavailable
 function persist(){window.Vitality.save(store)}
 function todayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 
 /* THE shared recovery formula — identical to peak.html recoveryFromVitals,
    docs/THE-MATH.md §5 and /sweep. whoopRecovery (a device) wins; else the two
-   manual inputs. Change here → change all. */
-function estRecovery(h){
+   manual inputs. Change here → change all.
+   The second arg is the night's hours, handed in by hoursFor() below: from the
+   Sleep tile when it has them, otherwise from this record's own legacy
+   sleepHours. The formula itself is untouched — the two copies must never
+   drift, so the lookup lives at the call site, not inside the maths. */
+function estRecovery(h,sh){
   if(!h) return null;
   if(typeof h.whoopRecovery==='number') return Math.max(1,Math.min(99,Math.round(h.whoopRecovery)));
   const c=x=>Math.max(0,Math.min(1,x)),parts=[],w=[];
   if(typeof h.feel==='number'){ parts.push(Math.max(0,Math.min(100,h.feel))); w.push(0.6); }
-  if(typeof h.sleepHours==='number'){ parts.push(c(h.sleepHours/8)*100); w.push(0.4); }
+  if(typeof sh==='number'&&isFinite(sh)){ parts.push(c(sh/8)*100); w.push(0.4); }
   if(!parts.length) return null;
   const sw=w.reduce((a,b)=>a+b,0); let s=0; for(let i=0;i<parts.length;i++)s+=parts[i]*w[i];
   return Math.max(1,Math.min(99,Math.round(s/sw)));
 }
 function tone(r){ if(r==null)return ''; if(r>=67)return 'good'; if(r>=34)return 'watch'; return 'low'; }
 function fmtSleep(h){const hh=Math.floor(h),mm=Math.round((h-hh)*60);return hh+'h'+(mm?' '+mm+'m':'');}
+
+/* ── the night convention, and the only place it is decided here ──
+   A night is keyed by the day it BEGAN. Local fields only, and setDate rather
+   than +86400000: a 23h or 25h DST day would otherwise skip or repeat a night.
+   Change these to match sleep.html's dateKey/parseKey/shiftKey — they are a
+   local copy on purpose, because a tile is ONE sealed self-contained file with
+   no imports and no network, so there is nowhere to share them from.
+   Mirrors: sleep.html PURE block, peak.html nightKeyBefore/nightKeyAfter. */
+function dateKey(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function parseKey(k){
+  const p=String(k).split('-');
+  return new Date(Number(p[0]),Number(p[1])-1,Number(p[2]));
+}
+function shiftKey(k,n){
+  const d=parseKey(k);
+  d.setDate(d.getDate()+n);
+  return dateKey(d);
+}
+/** Last night's key: the night that ENDED this morning, today - 1 day. */
+function lastNightKey(now){
+  const d=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  d.setDate(d.getDate()-1);
+  return dateKey(d);
+}
+/** The night BEFORE the morning a record was typed on. The legacy Vitals store
+    keyed sleepHours by the logging day, so its key needs this shift to be
+    compared with a sleep-store key. */
+function nightKeyBefore(logKey){ return shiftKey(logKey,-1); }
+/** The morning a night's hours get typed. */
+function nightKeyAfter(nightKey){ return shiftKey(nightKey,1); }
+
+/* Hours for a LOGGING DAY k (the morning the user checks in): the Sleep tile
+   is asked about the NIGHT that morning belongs to, k - 1 day, and a legacy
+   sleepHours still parked on this record under k itself is the fallback. The
+   Sleep tile WINS when both are present, so a night corrected in Sleep is the
+   one that counts; the legacy field is the safety net for a user who has not
+   opened Sleep yet, or whose read failed. Both halves name the same night —
+   otherwise a pre-move and a post-move user would read one recovery off two
+   different nights. */
+function hoursFor(k){
+  const s=sleepStore[nightKeyBefore(k)];
+  if(s&&typeof s.hours==='number'&&isFinite(s.hours))return s.hours;
+  const r=store[k];
+  if(r&&typeof r.sleepHours==='number'&&isFinite(r.sleepHours))return r.sleepHours;
+  return null;
+}
 function todays(){return store[todayKey()]||null;}
-function entries(){return Object.keys(store).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).sort().map(k=>({k,r:estRecovery(store[k])})).filter(e=>e.r!=null);}
+function entries(){
+  const keys=new Set([...Object.keys(store),...Object.keys(sleepStore)]);
+  return [...keys].filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).sort()
+    .map(k=>({k,r:estRecovery(store[k],hoursFor(k))})).filter(e=>e.r!=null);
+}
 
 function trend(){
   const e=entries().slice(-7);
@@ -131,13 +205,28 @@ function trend(){
 }
 
 function render(){
-  const t=todays(),rec=estRecovery(t),tn=tone(rec);
+  const t=todays(),rec=estRecovery(t,hoursFor(todayKey())),tn=tone(rec);
   const line=trend();
+  const h=hoursFor(todayKey());
+  // The sleep stepper is GONE — Sleep owns hours. What is left is a read-only
+  // line so the history stays visible here, with a route to the tile that owns it.
+  // "couldn't reach Sleep" and "nothing logged yet" are different states and are
+  // never collapsed into the same words: the first is a failure, the second is a fact.
+  const sleepTxt = h!=null ? fmtSleep(h) : (sleepState==='unavailable'?'sleep unavailable':'not logged');
+  // Name the NIGHT in full. This tile is opened on the morning of k and is
+  // about the night before it; saying so removes the only ambiguity that matters.
+  const nightLab='sleep &middot; night of '+parseKey(nightKeyBefore(todayKey()))
+    .toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const sleepLine='<div class="sleepNote">'
+    +'<span class="sleepNoteL">'+nightLab+'</span>'
+    +'<span class="sleepNoteV'+(h==null?' none':'')+'">'+sleepTxt+'</span>'
+    +'<span class="sleepNoteA">logged in Sleep</span>'
+    +'</div>';
   document.getElementById('app').innerHTML=
     '<div class="hero"><div class="rec '+tn+'">'+(rec!=null?rec+'%':'—')+'</div></div>'
     +'<div class="whoop"><button class="whoopBtn" data-whoop><span class="dot"></span>Connect WHOOP</button></div>'
     +'<div class="card">'
-      +'<div class="sleepRow"><button class="step" data-sleep="-0.5">−</button><span class="sleepVal">'+fmtSleep(draft.sleepHours)+'</span><button class="step" data-sleep="0.5">+</button></div>'
+      +sleepLine
       +'<div class="feelRow" style="margin-top:20px">'+FEEL.map((f)=>'<button class="feel'+(draft.feel===f[1]?' on':'')+'" data-feel="'+f[1]+'">'+f[0]+'</button>').join('')+'</div>'
       +'<button class="saveBtn" data-save '+(draft.feel==null?'disabled':'')+' aria-label="Save">✓</button>'
     +'</div>'
@@ -145,14 +234,14 @@ function render(){
 }
 
 document.addEventListener('click',e=>{
-  const s=e.target.closest('[data-sleep]');
-  if(s){draft.sleepHours=Math.max(0,Math.min(14,draft.sleepHours+parseFloat(s.getAttribute('data-sleep'))));render();return}
   const f=e.target.closest('[data-feel]');
   if(f){draft.feel=Number(f.getAttribute('data-feel'));render();return}
   if(e.target.closest('[data-save]')){
     if(draft.feel==null)return;
     const k=todayKey(),prev=store[k]||{};
-    store[k]=Object.assign({},prev,{sleepHours:draft.sleepHours,feel:draft.feel});
+    // Merge, never replace: whoopRecovery and any legacy sleepHours already in
+    // this record are carried over untouched. Vitals writes ONLY feel now.
+    store[k]=Object.assign({},prev,{feel:draft.feel});
     persist();render();
   }
 });
@@ -161,8 +250,27 @@ if(!window.Vitality){window.Vitality={save:function(d){try{localStorage.setItem(
 (async()=>{
   const d=await window.Vitality.load();
   store=(d&&typeof d==='object'&&!Array.isArray(d))?d:{};
+  // Read the hours Sleep owns. A rejected or absent read leaves sleepStore
+  // empty and sleepState 'unavailable' — the day then falls back to the legacy
+  // sleepHours in this tile's own records, so nothing that used to render stops.
+  if(typeof window.Vitality.read!=='function'){ sleepState='unavailable'; }
+  else{
+    try{
+      const s=await window.Vitality.read('sleep');
+      // The bridge shim RESOLVES null on its 8-second timeout instead of
+      // rejecting, so catch never fires and an empty store is
+      // indistinguishable from a store we never got to read. A resolved null is
+      // therefore treated as a FAILED read ('unavailable'), which is the
+      // conservative direction: the day falls back to the legacy sleepHours in
+      // this tile's own records rather than claiming nothing was logged.
+      // A resolved OBJECT — including the empty `{}` the host sends for a slot
+      // that has never been written — is a real read and means 'ready'.
+      if(s==null){ sleepStore={}; sleepState='unavailable'; }
+      else{ sleepStore=(s&&typeof s==='object'&&!Array.isArray(s))?s:{}; sleepState='ready'; }
+    }catch(e){ sleepStore={}; sleepState='unavailable'; }
+  }
   const t=todays();
-  if(t){ if(typeof t.sleepHours==='number')draft.sleepHours=t.sleepHours; if(typeof t.feel==='number')draft.feel=t.feel; }
+  if(t&&typeof t.feel==='number')draft.feel=t.feel;
   render();
 })();
 </script>
