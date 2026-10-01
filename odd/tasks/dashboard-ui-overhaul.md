@@ -54,7 +54,9 @@ Implementation route: **delegated direct**, one bounded writer per task, execute
 - [ ] Restore pinch-zoom in the viewport meta.
 - Route: delegated direct. Trigger: spans `globals.css`, `dashboard.module.css`, and `layout.tsx`.
 - Checks: `pnpm build`.
-- Status/evidence/commit: pending.
+- Status/evidence/commit: **done; committed**. `pnpm build` passed (writer and parent spot check): `✓ Compiled successfully`, type/lint clean, `Generating static pages (10/10)`. `html, body` moved from `height: 100%` to `min-height: 100%` so the document can grow; `scroll-behavior: smooth` added under `prefers-reduced-motion: no-preference` so the reduced-motion path stays genuinely instant; `scroll-padding-top` added carrying the safe-area inset; `maximumScale` and `userScalable` removed so pinch-zoom works again. Commit `3135c05`.
+- Correction to the earlier map: the dashboard header is NOT sticky or fixed (`.header` is normal-flow with a one-shot `fadeUp`), so `scroll-padding-top` is a comfort gutter, not header clearance. No `touch-action: none` blocks pinch-zoom outside deliberate edit mode.
+- Follow-up, not fixed (belongs to UX-3): `DashboardGrid.tsx:541-545` sets `document.body.style.overflow = 'hidden'` while the mentor overlay is alive, an independent scroll lock.
 
 ### UX-2 — English-only copy and consistent terminology
 - [ ] Translate the entire `SettingsPanel` to English, using sentence case to match the rest of the app.
@@ -62,7 +64,9 @@ Implementation route: **delegated direct**, one bounded writer per task, execute
 - [ ] Standardize "card" to "tile" in the copy so the UI has one name for the same object.
 - Route: delegated direct. Trigger: many strings across one large file, each needing consistent terminology.
 - Checks: `pnpm build`.
-- Status/evidence/commit: pending.
+- Status/evidence/commit: **done; copy-only; uncommitted at time of writing**. 23 strings translated in `SettingsPanel` to sentence-case English. Vocabulary taken from the codebase itself: `equation` and `active goal` already appear in `lib/tiles/weights.ts` and `MentorPage.tsx`, so no competing term was invented. Tab pills stay lowercase because the button already applies `textTransform: 'uppercase'`. "card" standardized to "tile" in the two info-tab strings so the UI has one name for the same object.
+- Verification: parent grep for Spanish accented characters and lexicon across `app/`, `components/`, `lib/`, `public/` returns **no matches**. `pnpm build` passed (writer and parent spot check): `✓ Compiled successfully`, `Generating static pages (10/10)`. Risk assessed medium, `review_due: false` (`under_budget`), so no native review.
+- Reported, not fixed: `app/global-error.tsx:54` links to `href="/app"`, a dead route (the dashboard is at `/`; `DashboardGrid.tsx:176` correctly uses `/`). The settings tab-strip render order (profile, goals, data, how, yours) does not match the `TabType` declaration order (how declared between goals and yours) — harmless, since pills are driven by explicit ids.
 
 ### UX-3 — 3-column tile grid
 - [ ] Replace the `.xRow` flex scroller with a real 3-column grid that grows by rows, and remove the horizontal scroll affordance.
@@ -101,5 +105,5 @@ Implementation route: **delegated direct**, one bounded writer per task, execute
 
 ## Progress
 - Branch: `master` (single-branch layout).
-- Completed: read-only exploration and mapping of the UI surface. No source changes yet.
-- Current next step: UX-1, smooth scroll and motion foundation.
+- Completed: read-only exploration and mapping of the UI surface. UX-1 committed (`3135c05`). UX-2 verified, ready to commit.
+- Current next step: UX-3, 3-column tile grid.

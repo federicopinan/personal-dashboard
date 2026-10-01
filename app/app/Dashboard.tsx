@@ -113,11 +113,11 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
       <div style={{ width: 'min(540px, 100%)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-elevated, #121212)', border: '1px solid var(--border, #262626)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,.6)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px 10px', borderBottom: '1px solid var(--border, #262626)', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: 6, overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: 2, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', maxWidth: 'calc(100% - 36px)' }}>
-            {pill('profile', 'Perfil')}
-            {pill('goals', 'Ecuación')}
-            {pill('data', 'Datos')}
-            {pill('how', 'Info')}
-            {pill('yours', 'Estilo')}
+            {pill('profile', 'profile')}
+            {pill('goals', 'equation')}
+            {pill('data', 'data')}
+            {pill('how', 'info')}
+            {pill('yours', 'style')}
           </div>
           <button type="button" aria-label="Close" onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--muted, #8a8f98)', cursor: 'pointer', padding: 4, display: 'flex' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" /></svg>
@@ -127,10 +127,10 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
         <div style={{ overflowY: 'auto', padding: '20px 24px' }}>
           {tab === 'profile' && (
             <div>
-              <p style={{ fontWeight: 600, color: 'var(--fg, #fff)', margin: '0 0 14px', fontSize: 15 }}>Perfil de Usuario</p>
+              <p style={{ fontWeight: 600, color: 'var(--fg, #fff)', margin: '0 0 14px', fontSize: 15 }}>User profile</p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12 }}>
                 <div>
-                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nombre</label>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Name</label>
                   <input
                     type="text"
                     value={prof.name ?? ''}
@@ -139,7 +139,7 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Edad</label>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Age</label>
                   <input
                     type="number"
                     value={prof.age ?? ''}
@@ -148,7 +148,7 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Peso (kg)</label>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Weight (kg)</label>
                   <input
                     type="number"
                     value={prof.weightKg ?? ''}
@@ -157,7 +157,7 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Altura (cm)</label>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Height (cm)</label>
                   <input
                     type="number"
                     value={prof.heightCm ?? ''}
@@ -166,24 +166,24 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Sexo</label>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Sex</label>
                   <select
                     value={prof.sex ?? 'male'}
                     onChange={(e) => setProf({ ...prof, sex: e.target.value as 'male' | 'female' })}
                     style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'var(--bg, #000)', border: '1px solid var(--border, #262626)', color: 'var(--fg, #fff)', fontSize: 16 }}
                   >
-                    <option value="male">Masculino</option>
-                    <option value="female">Femenino</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Unidades</label>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Units</label>
                   <select
                     value={prof.units ?? 'metric'}
                     onChange={(e) => setProf({ ...prof, units: e.target.value as 'metric' | 'imperial' })}
                     style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'var(--bg, #000)', border: '1px solid var(--border, #262626)', color: 'var(--fg, #fff)', fontSize: 16 }}
                   >
-                    <option value="metric">Métrico (kg, cm)</option>
+                    <option value="metric">Metric (kg, cm)</option>
                     <option value="imperial">Imperial (lbs, ft)</option>
                   </select>
                 </div>
@@ -193,16 +193,16 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
                 onClick={handleSaveProfile}
                 style={{ width: '100%', marginTop: 20, padding: '0.7rem 1rem', borderRadius: 999, background: 'var(--mint, #6EE7B7)', color: 'var(--mint-ink, #042a1c)', border: 'none', fontWeight: 600, cursor: 'pointer' }}
               >
-                {profSaved ? 'Guardado ✓' : 'Guardar Perfil'}
+                {profSaved ? 'Saved ✓' : 'Save profile'}
               </button>
             </div>
           )}
 
           {tab === 'goals' && (
             <div>
-              <p style={{ fontWeight: 600, color: 'var(--fg, #fff)', margin: '0 0 14px', fontSize: 15 }}>Meta Activa & Pesos de Ecuación</p>
+              <p style={{ fontWeight: 600, color: 'var(--fg, #fff)', margin: '0 0 14px', fontSize: 15 }}>Active goal & equation weights</p>
               
-              <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Seleccionar Meta Activa</label>
+              <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Select active goal</label>
               <select
                 value={selectedGId}
                 onChange={(e) => setSelectedGId(e.target.value)}
@@ -215,7 +215,7 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
 
               {currentGoal && (
                 <div>
-                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nombre de la Meta</label>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Goal name</label>
                   <input
                     type="text"
                     value={currentGoal.title}
@@ -226,7 +226,7 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
                     style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'var(--bg, #000)', border: '1px solid var(--border, #262626)', color: 'var(--fg, #fff)', fontSize: 16, marginBottom: 16 }}
                   />
 
-                  <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>Pesos por Tile (%):</p>
+                  <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>Weights per tile (%):</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {['train', 'fuel', 'vitals', 'peak', 'finance'].map((tileKey) => {
                       const weightVal = currentGoal.weights?.[tileKey] ?? 0
@@ -254,7 +254,7 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
                 onClick={handleSaveGoals}
                 style={{ width: '100%', marginTop: 20, padding: '0.7rem 1rem', borderRadius: 999, background: 'var(--mint, #6EE7B7)', color: 'var(--mint-ink, #042a1c)', border: 'none', fontWeight: 600, cursor: 'pointer' }}
               >
-                {goalsSaved ? 'Guardado ✓' : 'Guardar Cambios en Ecuación'}
+                {goalsSaved ? 'Saved ✓' : 'Save equation changes'}
               </button>
             </div>
           )}
@@ -297,13 +297,13 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
         {tab === 'data' && (
           <div style={{ padding: '22px 24px' }}>
             <p style={{ color: 'var(--muted)', lineHeight: 1.6, margin: 0, fontSize: 14 }}>
-              Don&apos;t like the demo numbers? <strong style={{ color: 'var(--fg)' }}>Every card stays</strong> — only
+              Don&apos;t like the demo numbers? <strong style={{ color: 'var(--fg)' }}>Every tile stays</strong> — only
               what&apos;s inside goes black. Wipe one tile to keep it as a clean shell, or detonate all
               the data at once.
             </p>
             {dataIds.length === 0 ? (
               <p style={{ ...mono, fontSize: 11, color: 'var(--muted, #8a8f98)', margin: '18px 0 0' }}>
-                no saved tile data on this device — the cards are already clean.
+                no saved tile data on this device — the tiles are already clean.
               </p>
             ) : (
               <>
