@@ -43,6 +43,22 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
     setDataIds(tileStore.listDataIds(userId))
   }, [userId])
 
+  // The equation tab keeps its own copy of the goals, seeded once at mount, so a
+  // delete in the mentor (or a save from another tab) would leave this panel
+  // offering a goal that no longer exists until a reload. Re-read on the same bus
+  // the save already uses. Unsaved weight edits are the one thing this drops —
+  // the panel is modal, so nothing can change the goals underneath it while it
+  // is open except the mentor's own Delete, and losing an uncommitted slider
+  // drag to a deliberate delete is the smaller wrong.
+  useEffect(() => {
+    const onGoal = () => {
+      setGoalList(goals())
+      setSelectedGId(activeGoalId() || goals()[0]?.id || '')
+    }
+    window.addEventListener('vitality:goal', onGoal)
+    return () => window.removeEventListener('vitality:goal', onGoal)
+  }, [])
+
   const copy = (text: string, tag: string) => {
     navigator.clipboard?.writeText(text).then(() => {
       setCopied(tag)

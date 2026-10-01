@@ -229,6 +229,73 @@ export function saveGoals(list: Goal[]): void {
   }
 }
 
+/** What a delete actually did, so the UI can say something true about it. */
+export interface DeleteResult {
+  /** false when nothing was removed — the id is the overall goal, or no such goal */
+  removed: boolean
+  /** true when 'vitality:goal:active' had to be rewritten to stay real */
+  activeRepaired: boolean
+  /** the id the board is on now */
+  activeId: string
+}
+
+/**
+ * Delete a stored goal, and repair the active-goal pointer if it named it.
+ *
+ * THIS IS THE ONE IRREVERSIBLE WRITE IN THE FILE. A weight like `finance: 60`
+ * exists ONLY inside its own goal's object — there is no cross-goal index and no
+ * tombstone — so deleting the goal destroys those numbers for good. Callers are
+ * expected to confirm first; this function does not decide that for them.
+ *
+ * OVERALL_GOAL is a code constant rather than a stored goal, so there is in
+ * fact nothing of it to delete. It is refused by id anyway instead of leaning on
+ * that accident, so a stored goal that happens to be called 'overall' cannot be
+ * quietly mistaken for the main one either.
+ *
+ * The pointer is repaired here rather than left for `activeGoal()`'s
+ * `?? goals()[0]`, because that fallback only fixes the RENDER: the stale id
+ * stays on disk, so the next write that trusts it (Dashboard's save, or the
+ * mentor switching goals) re-activates a goal that is gone.
+ *
+ * The replacement is the first goal left in the list — the same answer
+ * `activeGoalId()` already gives when nothing is stored, so "nothing is
+ * selected" and "the selected goal was just deleted" resolve to ONE rule rather
+ * than two, and nothing on screen moves at the moment of the delete. When the
+ * last stored goal goes, it falls to OVERALL_GOAL rather than to '': that is the
+ * one goal that can never be removed, so the pointer always names a real goal
+ * and the board still has an equation to show.
+ *
+ * The repair runs even when `id` matched nothing. A pointer left dangling by an
+ * earlier session is exactly the state this function exists to clean up, and
+ * refusing a no-op delete is no reason to leave the lie in place.
+ *
+ * An unreadable 'vitality:goals' is treated as the defaults, because that is what
+ * `storedGoals()` — and therefore what the mentor was showing when the ✕ was
+ * clicked — already did. Deleting from that list writes the filtered defaults
+ * back, which also repairs the corrupt payload. Every other write in the app
+ * (Dashboard's save, the mentor's add) normalises the same way, so this is not a
+ * new behaviour; a delete cannot be the one save that fails.
+ */
+export function deleteGoal(id: string): DeleteResult {
+  const current = activeGoalId()
+  if (id === OVERALL_GOAL.id) return { removed: false, activeRepaired: false, activeId: current }
+
+  // storedGoals(), not goals(): this is a WRITE, and goals() fills in weights
+  // the saved file is missing for display only. Re-saving the list through it
+  // would persist a weight the user never chose.
+  const stored = storedGoals()
+  const next = stored.filter((g) => g.id !== id)
+  const removed = next.length !== stored.length
+  if (removed) saveGoals(next)
+
+  const stillThere = current === OVERALL_GOAL.id || next.some((g) => g.id === current)
+  if (stillThere) return { removed, activeRepaired: false, activeId: current }
+
+  const replacement = next[0]?.id ?? OVERALL_GOAL.id
+  setActiveGoalId(replacement)
+  return { removed, activeRepaired: true, activeId: replacement }
+}
+
 /**
  * The shipped weight for one tile, as a last resort for a goal that is missing
  * the key. Read from DEFAULT_GOALS/OVERALL_GOAL by goal id, so the number comes

@@ -528,6 +528,18 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
     }
   }, [])
 
+  // The board DISPATCHES vitality:goal but never listened to it, so its own
+  // `goal` state could only be corrected by the one-off read in the mentor's
+  // onClose. Delete a goal in the mentor and the board kept rendering that goal's
+  // title, accent and weights — the badges and the x = breakdown described a goal
+  // that was no longer in storage. Listening makes the board follow every writer:
+  // the settings sheet, the mentor page, and a second tab.
+  useEffect(() => {
+    const onGoal = () => setGoal(readActiveGoal())
+    window.addEventListener('vitality:goal', onGoal)
+    return () => window.removeEventListener('vitality:goal', onGoal)
+  }, [])
+
   // While the mentor is alive over the board, the board must not scroll —
   // only the overlay does (it has its own overflowY). Blur stays.
   useEffect(() => {

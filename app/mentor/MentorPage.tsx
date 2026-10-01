@@ -10,6 +10,7 @@ import {
   setActiveGoalId,
   storedGoals,
   saveGoals,
+  deleteGoal,
   noticedFeed,
   tileIdeas,
   type Goal,
@@ -80,13 +81,62 @@ export default function MentorPage({
   const [active, setActive] = useState('')
   const [draft, setDraft] = useState('')
   const [ideasOpen, setIdeasOpen] = useState(false) // the +: blueprints for tiles you're missing
+  const [removing, setRemoving] = useState(false) // "manage" mode: pills grow a delete ✕
+  const [pendingDelete, setPendingDelete] = useState<Goal | null>(null) // the confirm, if one is open
+  const [draftError, setDraftError] = useState('') // why a goal was NOT added, in the composer's own words
   const gemRef = useRef<HTMLDivElement | null>(null)
+  // Focus goes HERE on open and comes back here on close, so a confirm can never
+  // strand the keyboard on a pill that no longer exists. The cancel button is
+  // the landing spot: the destructive one must never be where focus starts.
+  const confirmRef = useRef<HTMLButtonElement | null>(null)
+  const deleteReturnRef = useRef<HTMLButtonElement | null>(null)
+  const pillRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+
+  // Read both keys, always together, from one place — the mentor can be alive
+  // OVER the board, where the settings sheet and the board are live readers of
+  // the same two keys, and a delete has to land on every one of them.
+  const refresh = () => {
+    setList(allGoals())
+    setActive(activeGoalId())
+  }
 
   useEffect(() => {
     setMounted(true)
-    setList(allGoals())
-    setActive(activeGoalId())
+    refresh()
   }, [])
+
+  // The board and the settings sheet write the goals and announce it on this bus.
+  // MentorPage is the one surface that could go stale, because it seeds its list
+  // once and then only refreshes after its own writes.
+  useEffect(() => {
+    const onGoal = () => refresh()
+    window.addEventListener('vitality:goal', onGoal)
+    return () => window.removeEventListener('vitality:goal', onGoal)
+  }, [])
+
+  // Focus enters the confirm on Cancel, and leaves on EVERY close path (Escape,
+  // scrim, Keep it, Delete it), so a keyboard user starts on the safe button and
+  // is returned to the control they came from. Driven by the state change rather
+  // than the click handler, so it holds however the dialog was opened.
+  useEffect(() => {
+    if (pendingDelete) confirmRef.current?.focus()
+  }, [pendingDelete])
+
+  // Escape closes the confirm from anywhere on the page while it is open. A
+  // window listener rather than onKeyDown on the dialog, because there is
+  // deliberately no focus trap here — Tab can walk out of the confirm, and once
+  // it has, an onKeyDown scoped to the dialog would stop hearing Escape.
+  useEffect(() => {
+    if (!pendingDelete) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      setPendingDelete(null)
+      pillRefs.current[pendingDelete.id]?.focus()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pendingDelete])
 
   // Pulse the gem when the goal changes — WAAPI on the wrapper, NO remount.
   // (Remounting would re-init the WebGL gem: heavy, and it visibly glitches.)
@@ -111,21 +161,66 @@ export default function MentorPage({
   const entries = Object.entries(act?.weights ?? {}).sort((a, b) => b[1] - a[1])
   const advice = noticedFeed()[0]
 
+  // Announce on the bus after every write, not just the delete: the board's
+  // goal row, the settings sheet and this page are three readers of the same two
+  // keys, and the bus is the only thing that reaches all of them. Without it a
+  // goal switched HERE left the board rendering the old title, accent and badges.
+  const announce = () => {
+    try {
+      window.dispatchEvent(new CustomEvent('vitality:goal'))
+    } catch {
+      /* ignore */
+    }
+  }
+
   const switchGoal = (id: string) => {
     setActiveGoalId(id)
     setActive(id)
+    announce()
   }
 
   const addGoal = () => {
     const raw = draft.trim()
     if (!raw) return
-    const id = 'g-' + raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 24)
+    // Trimming the slug before slicing matters: "Get jacked!" and "Get jacked?"
+    // both slugs to the same id, and a row of two identical React keys is a
+    // warning today and an ambiguous delete tomorrow.
+    const id = 'g-' + raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24)
+    if (storedGoals().some((g) => g.id === id)) {
+      setDraftError('That one is already on the board — a different title, or a weight to change.')
+      return
+    }
     // storedGoals(), not goals(): this is a WRITE, and goals() fills in weights
     // the saved file is missing for display only. Re-saving the list through it
     // would persist a weight the user never chose.
     saveGoals([...storedGoals(), { id, title: raw, weights: {}, pending: true } as Goal])
     setList(allGoals())
     setDraft('')
+    setDraftError('')
+    announce()
+  }
+
+  const askDelete = (g: Goal) => setPendingDelete(g)
+
+  const closeConfirm = () => {
+    setPendingDelete(null)
+    // Focus returns to the pill that was clicked. It is a sibling of the button
+    // that opened the dialog, not inside it, so it is still mounted after the
+    // goal is gone from the list — the focus is never left on a removed node.
+    pillRefs.current[pendingDelete?.id ?? '']?.focus()
+  }
+
+  const doDelete = () => {
+    if (!pendingDelete) return
+    const gone = pendingDelete
+    setPendingDelete(null)
+    deleteGoal(gone.id)
+    refresh()
+    announce()
+    // Removing a pill shifts the row left, so the nearest remaining control is
+    // the manage toggle — a stable node that still exists, so focus is not lost
+    // to the document body (which is where it would land on a row that empties).
+    deleteReturnRef.current?.focus()
   }
 
   const mono: React.CSSProperties = {
@@ -144,6 +239,16 @@ export default function MentorPage({
         @keyframes bpVeil { from { opacity: 0 } to { opacity: 1 } }
         @keyframes bpIn { from { opacity: 0; transform: translateY(22px) scale(.94) } to { opacity: 1; transform: none } }
         @keyframes bpRow { from { opacity: 0; transform: translateY(16px) } to { opacity: 1; transform: none } }
+
+        /* The delete confirm. Its entrance is the same rise the rest of the page
+           uses, and it is the one thing here gated on prefers-reduced-motion: a
+           confirm that flies in is a confirm the user did not ask for, so under
+           reduce it appears with no motion at all. Inline animation declarations
+           are the reason this needs a class — an inline style is not reachable by
+           a media query, which is exactly why dashboard.module.css exists. */
+        @media (prefers-reduced-motion: reduce) {
+          .mentorConfirmVeil, .mentorConfirmCard { animation: none !important; }
+        }
       `}</style>
       {!overlay && <WelcomeBackdrop />}
       <div
@@ -210,33 +315,113 @@ export default function MentorPage({
           <p style={{ ...mono, fontSize: 10.5, color: accent, margin: '10px 0 0', transition: 'color .8s ease' }}>notices everything · runs the math</p>
         </div>
 
-        {/* the goal — easy in, easy out */}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', marginTop: 34, animation: 'fadeUp .8s ease .25s both' }}>
+        {/* the goal — easy in, easy out.
+
+            The delete affordance is BEHIND a mode toggle rather than sitting on
+            every pill: an ✕ 12px from a "switch this goal" target is a mis-tap
+            away from destroying a file that cannot be rebuilt, and the row is the
+            one surface in the app that is pure navigation. Same idiom as the
+            board's Edit/Done, so it is not a new idea in this UI. The ✕ is a
+            SEPARATE button at --touch, never nested inside the pill — nesting a
+            button in a button is invalid HTML and the pill's own hit area would
+            swallow the tap it is trying to guard against. */}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center', marginTop: 34, animation: 'fadeUp .8s ease .25s both' }}>
           {list.map((g) => {
             const on = g.id === active
             const gA = g.accent ?? '#6EE7B7'
+            const isOverall = g.id === 'overall'
             return (
-              <button
-                key={g.id}
-                type="button"
-                onClick={() => switchGoal(g.id)}
-                style={{
-                  ...mono,
-                  fontSize: 11,
-                  color: on ? gA : 'var(--muted, #8a8f98)',
-                  background: on ? `${gA}12` : 'transparent',
-                  border: `1px solid ${on ? gA + '59' : 'var(--border, #262626)'}`,
-                  borderRadius: 999,
-                  padding: '8px 16px',
-                  cursor: 'pointer',
-                  transition: 'color .6s ease, border-color .6s ease, background .6s ease',
-                }}
-              >
-                {g.id === 'overall' ? '★ ' : ''}
-                {g.title}
-              </button>
+              <span key={g.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                <button
+                  ref={(el) => { pillRefs.current[g.id] = el }}
+                  type="button"
+                  onClick={() => switchGoal(g.id)}
+                  aria-current={on ? 'true' : undefined}
+                  style={{
+                    ...mono,
+                    fontSize: 11,
+                    color: on ? gA : 'var(--muted, #8a8f98)',
+                    background: on ? `${gA}12` : 'transparent',
+                    border: `1px solid ${on ? gA + '59' : 'var(--border, #262626)'}`,
+                    borderRadius: 999,
+                    padding: '0 16px',
+                    // --touch, like the board's own goal pills. The old 8px
+                    // padding put this row at ~32px, under the app's own floor.
+                    minHeight: 'var(--touch)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    transition: 'color .6s ease, border-color .6s ease, background .6s ease',
+                  }}
+                >
+                  {isOverall ? '★ ' : ''}
+                  {g.title}
+                </button>
+
+                {removing && (
+                  isOverall ? (
+                    // The overall goal is a code constant, not a saved goal —
+                    // there is nothing in localStorage to remove. It is shown
+                    // locked rather than given a button that does nothing, so the
+                    // reason is visible before anyone taps it.
+                    <span
+                      aria-hidden
+                      title="The overall goal is the synthesis of every goal — the mentor keeps it."
+                      style={{ display: 'inline-grid', placeItems: 'center', width: 'var(--touch)', height: 'var(--touch)', color: 'var(--muted, #8a8f98)', opacity: 0.45, fontSize: 13 }}
+                    >
+                      ★
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => askDelete(g)}
+                      aria-label={`Delete goal: ${g.title}`}
+                      title={`Delete ${g.title}`}
+                      style={{
+                        display: 'inline-grid',
+                        placeItems: 'center',
+                        width: 'var(--touch)',
+                        height: 'var(--touch)',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: 999,
+                        color: 'var(--muted, #8a8f98)',
+                        fontSize: 17,
+                        lineHeight: 1,
+                        cursor: 'pointer',
+                        transition: 'color .2s ease, background .2s ease',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = '#ff6b6b' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted, #8a8f98)' }}
+                    >
+                      ✕
+                    </button>
+                  )
+                )}
+              </span>
             )
           })}
+
+          <button
+            ref={deleteReturnRef}
+            type="button"
+            onClick={() => setRemoving((v) => !v)}
+            aria-pressed={removing}
+            style={{
+              ...mono,
+              fontSize: 10,
+              letterSpacing: '.12em',
+              color: removing ? 'var(--fg, #fff)' : 'var(--muted, #8a8f98)',
+              background: removing ? 'rgba(255,255,255,.08)' : 'transparent',
+              border: '1px solid var(--border, #262626)',
+              borderRadius: 999,
+              padding: '0 14px',
+              minHeight: 'var(--touch)',
+              cursor: 'pointer',
+            }}
+          >
+            {removing ? 'Done' : 'Manage goals'}
+          </button>
         </div>
 
         {/* x + x + x — the tiles, no borders, just the numbers */}
@@ -287,6 +472,111 @@ export default function MentorPage({
             +
           </button>
         </div>
+
+        {/* ── the confirm ──
+            Deleting a goal destroys its weights permanently: there is no
+            cross-goal index and no tombstone, so `finance: 60` exists only inside
+            that goal's object. The dialog says exactly that, in the app's own
+            voice, before anything is written.
+
+            It is NOT a focus trap. Escape closes it, the scrim closes it, Cancel
+            closes it, and Tab past the last button leaves it — a keyboard user
+            who wants out is never held. Focus lands on Cancel, never on the
+            destructive button: the safe choice is the default one. */}
+        {pendingDelete && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mentorConfirmTitle"
+            aria-describedby="mentorConfirmBody"
+            className="mentorConfirmVeil"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) closeConfirm()
+            }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 97,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 24,
+              background: 'rgba(0,0,0,.72)',
+              backdropFilter: 'blur(12px)',
+              animation: 'bpVeil .35s ease both',
+            }}
+          >
+            <div
+              className="mentorConfirmCard"
+              style={{
+                width: 'min(440px, 100%)',
+                textAlign: 'center',
+                padding: '30px 26px 24px',
+                borderRadius: 16,
+                border: '1px solid var(--border, #262626)',
+                background: 'var(--bg-elevated, #121212)',
+                boxShadow: '0 24px 60px rgba(0,0,0,.6)',
+                animation: 'bpIn .55s cubic-bezier(.34,1.56,.64,1) both',
+              }}
+            >
+              <p style={{ ...mono, fontSize: 9.5, color: '#ff6b6b', letterSpacing: '.2em', margin: '0 0 10px' }}>
+                THIS CANNOT BE UNDONE
+              </p>
+              <h2
+                id="mentorConfirmTitle"
+                style={{ fontFamily: 'var(--font-serif), Georgia, serif', fontStyle: 'italic', fontWeight: 400, fontSize: 25, color: 'var(--fg, #fff)', margin: 0 }}
+              >
+                Delete {pendingDelete.title}?
+              </h2>
+              <p
+                id="mentorConfirmBody"
+                style={{ fontSize: 13.5, lineHeight: 1.65, color: 'var(--muted, #b9c4be)', margin: '14px auto 0', maxWidth: 340 }}
+              >
+                Its weights go with it. Every percentage the mentor set for this goal lives only
+                here — there is no copy anywhere else, so they cannot be recovered.
+                {pendingDelete.id === active && ' The board will move to another goal.'}
+              </p>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 24, flexWrap: 'wrap' }}>
+                <button
+                  ref={confirmRef}
+                  type="button"
+                  onClick={closeConfirm}
+                  style={{
+                    ...mono,
+                    fontSize: 11,
+                    color: 'var(--fg, #fff)',
+                    background: 'transparent',
+                    border: '1px solid var(--border, #262626)',
+                    borderRadius: 999,
+                    padding: '0 20px',
+                    minHeight: 'var(--touch)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Keep it
+                </button>
+                <button
+                  type="button"
+                  onClick={doDelete}
+                  style={{
+                    ...mono,
+                    fontSize: 11,
+                    color: '#fff',
+                    background: '#e5484d',
+                    border: '1px solid #e5484d',
+                    borderRadius: 999,
+                    padding: '0 20px',
+                    minHeight: 'var(--touch)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Delete it
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {ideasOpen && (
           <div
@@ -454,12 +744,15 @@ export default function MentorPage({
         >
           <input
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value)
+              if (draftError) setDraftError('')
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') addGoal()
             }}
             placeholder="Write a goal, raw — the mentor shapes and weighs it."
-            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--fg, #fff)', fontSize: 13.5 }}
+            style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: 'var(--fg, #fff)', fontSize: 13.5 }}
           />
           <button
             type="button"
@@ -479,6 +772,11 @@ export default function MentorPage({
           >
             Give it to the mentor
           </button>
+          {draftError && (
+            <p role="status" style={{ ...mono, fontSize: 10.5, color: '#ff6b6b', margin: '12px 0 0', letterSpacing: '.04em', textTransform: 'none' }}>
+              {draftError}
+            </p>
+          )}
         </div>
       </div>
     </main>
