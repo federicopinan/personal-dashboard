@@ -17,41 +17,37 @@
   font-family:var(--hanken);
 }
 
-/* One flexible grid. Tiles size by span (s 1x1, m 2x1, lw full-width, lt 2x2)
-   and flow with `dense` packing; Vee is pinned to the centre 2x2 block. The
-   default order (DEFAULT_HOME_ORDER in lib/tiles/coreTiles) reproduces the
-   approved customize mockup arrangement, but every tile can now be dragged,
-   resized, removed, and re-added — core tiles and the user's own tiles alike. */
-.veeTiles .grid{
-  position:relative;width:100%;
-  --gap:18px;--rowh:clamp(118px,13.5vw,160px);--cols:4;
-  --cellw:calc((100% - (var(--cols) - 1) * var(--gap)) / var(--cols));
-  height:calc((var(--rowh) + var(--gap)) * var(--rows,1) - var(--gap));
-  transition:height .34s var(--vease);
+/* ── the tile grid ──
+   A real CSS grid: three columns, so the five inputs plus the + New tile button
+   fill the first two rows and every further tile adds a row. Nothing here is
+   absolutely placed and nothing scrolls sideways — the browser packs the cells
+   and the JSX only lists them. Vee (the mentor) is deliberately NOT a cell: it
+   stays a full-width hero above the grid, because its art is drawn for it. */
+.veeTiles .xGrid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:16px;
 }
-/* size presets resolve to spans. s = 1x1 (default, no rule). The seeded default
-   (Train hero, Fuel/Brand/Peak tall, Vee big, Finance m, Create band) + dense
-   flow reproduces the loved old composition exactly. Vee is NOT pinned anymore. */
-/* Every in-grid tile (and the Add button) is absolutely placed at the cell the
-   pure packer computed for it, from four inline vars (--x/--y/--w/--h). Position +
-   size transition, so any reflow — reorder, resize, add, remove — glides (the iOS
-   "slide aside"). Overlap is impossible because the packer only fills free cells. */
-.veeTiles .grid .tile,.veeTiles .grid .addtile{position:absolute;
-  left:calc((var(--cellw) + var(--gap)) * var(--x,0));
-  top:calc((var(--rowh) + var(--gap)) * var(--y,0));
-  width:calc(var(--cellw) * var(--w,1) + var(--gap) * (var(--w,1) - 1));
-  height:calc(var(--rowh) * var(--h,1) + var(--gap) * (var(--h,1) - 1));
-  transition:left .34s var(--vease),top .34s var(--vease),
-    width .3s var(--vease),height .3s var(--vease),
-    opacity .22s var(--vease),border-color .4s var(--vease),
-    background .4s var(--vease),box-shadow .4s var(--vease)}
+/* One cell = one tile. The cell (the drag box) carries the ratio the art was
+   drawn at — 15:17, the 300x340 the old fixed tiles used — so a tile is as wide
+   as its column and keeps its proportions at any width; its .tile just fills
+   the cell, which matters because every child of a .tile is absolutely
+   positioned. align-self:start sizes the row BY that ratio instead of letting
+   a definite-height box stretch. */
+.veeTiles .xCell,.veeTiles .xAdd{aspect-ratio:15/17;align-self:start}
+.veeTiles .xCell>.tile{width:100%;height:100%}
+/* the + tile: the same cell, transparent — build the next input */
+.veeTiles .xAdd{border:1px dashed rgba(110,231,183,.35);background:transparent;
+  border-radius:20px;color:var(--mint);font-family:inherit;font-size:46px;font-weight:300;
+  cursor:pointer;transition:border-color .2s var(--vease),background .2s var(--vease)}
+.veeTiles .xAdd:hover{border-color:var(--mint);background:rgba(110,231,183,.04)}
 
-/* phone = 2 cols. Columns clamp to the grid width (a 3-wide hero fills the row),
-   but the persisted size is untouched so it restores its true width on desktop. */
-/* phone = 2 cols. The packer clamps each tile's width to 2 (a 3-wide hero fills the
-   row) and re-packs; --cols here keeps the CSS cell math in lockstep with it. */
+/* Narrow: three columns hold down to 760px (a ~225px tile, which the tightened
+   type below still fits), then two, then a single full-width tile on a phone —
+   a 2-up cell there would be ~150px, too small for the 22px serif label. The
+   offsets are the 300px-tile numbers, pulled in as the cell narrows. */
 @media (max-width:760px){
-  .veeTiles .grid{--cols:2;--rowh:max(120px,28vw);--gap:12px;}
+  .veeTiles .xGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
   .veeTiles .tile{border-radius:16px;}
   .veeTiles .index{top:12px;left:14px;font-size:9px;}
   .veeTiles .glyph{top:10px;right:12px;width:18px;height:18px;}
@@ -62,7 +58,7 @@
   .veeTiles .tile.live .cap{flex-direction:column;align-items:flex-start;gap:2px;}
 }
 @media (max-width:480px){
-  .veeTiles .grid{--gap:10px;--rowh:max(110px,26vw);}
+  .veeTiles .xGrid{grid-template-columns:minmax(0,1fr);gap:10px}
   .veeTiles .label{font-size:16px;}
   .veeTiles .stat{font-size:13px;}
 }
@@ -311,13 +307,6 @@
 .veeTiles .tile.overlay{animation:none!important;cursor:grabbing;width:100%;height:100%;
   transform:scale(1.035);border-color:var(--mint);
   box-shadow:0 0 0 1px var(--mint),0 32px 66px -14px rgba(0,0,0,.82)}
-/* ── drag "pickup" ── while a tile is lifted the whole board calmly recedes and
-   stops wobbling, so the held tile clearly floats above and the reorder preview
-   (neighbours gliding to make room) reads. Pure opacity/filter — never touches
-   transform, so it can NEVER fight dnd-kit's translate and glitch. */
-.veeTiles .grid.dragging .tile.editable{animation:none}
-.veeTiles .grid.dragging .tile.editable:not(.dragging){opacity:.5;filter:saturate(.85) brightness(.88);
-  transition:opacity .22s var(--vease),filter .22s var(--vease)}
 @keyframes veeJiggle{0%,100%{transform:rotate(-.7deg)}50%{transform:rotate(.7deg)}}
 @media (prefers-reduced-motion:reduce){.veeTiles.editing .tile.editable{animation:none}}
 
@@ -407,54 +396,3 @@
   z-index: 6;
 }
 
-/* ── x-row horizontal scrollbar ──
-   Slim, dark, mint-accented scrollbar that fits the glass-mint theme. */
-.veeTiles .xRow::-webkit-scrollbar {
-  height: 5px;
-}
-.veeTiles .xRow::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 4px;
-}
-.veeTiles .xRow::-webkit-scrollbar-thumb {
-  background: rgba(110, 231, 183, 0.25);
-  border-radius: 4px;
-}
-.veeTiles .xRow::-webkit-scrollbar-thumb:hover {
-  background: rgba(110, 231, 183, 0.4);
-}
-@supports (scrollbar-color: auto) {
-  .veeTiles .xRow {
-    scrollbar-color: rgba(110, 231, 183, 0.25) rgba(255, 255, 255, 0.04);
-    scrollbar-width: thin;
-  }
-}
-
-/* ── x-row tile row: wraps vertically on phone ──
-   On desktop the x tiles scroll horizontally; on phone they stack in a single
-   column so every tile fills the screen width with no side-scroll. */
-@media (max-width: 760px) {
-  .veeTiles .xRow {
-    flex-direction: column;
-    overflow-x: visible !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    -webkit-mask: none !important;
-    mask: none !important;
-  }
-  .veeTiles .xRow > * {
-    width: 100% !important;
-  }
-  .veeTiles .xRow > * > * {
-    width: 100% !important;
-  }
-  .veeTiles .xRow .tile {
-    width: 100% !important;
-  }
-  .veeTiles .xRow .tile ~ span {
-    display: none;
-  }
-  .veeTiles .xRow > button {
-    width: 100% !important;
-  }
-}

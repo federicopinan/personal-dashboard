@@ -75,7 +75,14 @@ Implementation route: **delegated direct**, one bounded writer per task, execute
 - [ ] Preserve tile DOM identity, the `data-orb` / `data-roam` / `data-pt` attributes, and the `useTileHost` registration.
 - Route: delegated direct. Trigger: crosses the board component, the global tile stylesheet, and the dashboard module CSS.
 - Checks: `pnpm build`.
-- Status/evidence/commit: pending.
+- Status/evidence/commit: **done; uncommitted at time of writing**. The flex scroller `.xRow` is replaced by a real CSS grid `.xGrid` with `grid-template-columns: repeat(3, minmax(0, 1fr))` and a 16px gap. Cells carry `aspect-ratio: 15/17` — literally the old 300x340 reduced, so proportions are preserved rather than invented — with `align-self: start` so the row is sized by the ratio. `.xCell > .tile { width: 100%; height: 100% }` is load-bearing: every child of `.tile` is absolutely positioned, so without it tiles would collapse to a zero-height line. The hard `fixed={{ width: 300, height: 340 }}` is gone; `fixed` now only remains on the untouched Mentor hero.
+- Columns: 3 -> 2 (at 760px) -> 1 (at 480px), reusing the file's existing breakpoints.
+- Deleted with evidence of no remaining references (parent grep confirms zero hits for `xRow` and `className="grid"` in source): the dead absolute-positioned `.grid` system, the `.xRow` custom scrollbar, the mobile stack hack, the `overflowX`/mask/negative-margin inline styles, and the stale `.oneScreen .shell :global(.veeTiles .grid)` 1000px cap in `dashboard.module.css`. `lib/tiles/packLayout.ts` was deliberately KEPT and stays unreferenced: using it would mean JS owning `--x/--y` and therefore owning the column count, re-introducing the `matchMedia` state this task removes. Two lines in `docs/VISION.md` that advertised the scrollbar were corrected.
+- Bridge contract preserved (parent grep confirms): `data-orb` / `data-roam` / `data-pt` still sit on the `.tile` element at `DashboardGrid.tsx:155-157`, `veeTilesAnim.ts:245` still keys off `.tile[data-orb]`, cell keys remain the stable slot `id`, and nothing re-parents or re-keys tiles on resize.
+- `initVeeTiles` deps are now `[mounted, gridKey]` where `gridKey` is a sorted **set** signature of `gridIds`. The JS `cols` state and its `matchMedia` listener are deleted: they existed only to force a re-bind when the column bucket changed, and with CSS owning the columns a resize touches zero DOM nodes. Orb geometry is all SVG user-space, so no re-bind is needed. Adding or removing a tile re-runs the binding (so a removed tile stops animating); a pure reorder does not, so orbs do not teleport.
+- Verification: `pnpm build` passed (writer and parent spot check): `✓ Compiled successfully`, `Generating static pages (10/10)`. Dev server returned HTTP 200 and was stopped afterwards. Risk assessed medium, `review_due: false` (`under_budget`), so no native review. **Layout was not eyeballed in a browser — no browser is attached to this session.**
+- Known to need eyes at UX-6 or on deploy: at the 1180px shell width tiles become ~383x434, about 27% larger than before, and the 46px `%` readout plus the 22px `.label` are hard pixel sizes tuned for a 300px tile. The 1000px board cap was dropped rather than reinvented, so the grid is now flush with the full-width Mentor hero above it — a visual decision the user has not seen yet.
+- Design change the writer had to make unilaterally: the decorative `+` glyphs that sat between tiles (and before the add button) are **gone**, because in a grid each would consume a cell and break the six-cell layout. This removes part of the "y on top, x + x + x below" equation metaphor noted in the board's own comments. Flagged to the user for a decision.
 
 ### UX-4 — House-designed day selector
 - [ ] Build a custom day control matching the house tokens, replacing the bare native date input.
@@ -105,5 +112,5 @@ Implementation route: **delegated direct**, one bounded writer per task, execute
 
 ## Progress
 - Branch: `master` (single-branch layout).
-- Completed: read-only exploration and mapping of the UI surface. UX-1 committed (`3135c05`). UX-2 verified, ready to commit.
-- Current next step: UX-3, 3-column tile grid.
+- Completed: read-only exploration and mapping of the UI surface. UX-1 committed (`3135c05`), UX-2 committed (`f802b8f`). UX-3 verified, ready to commit.
+- Current next step: UX-4, house-designed day selector.

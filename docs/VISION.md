@@ -31,12 +31,13 @@ unblocking.
 
 ## 3. Visual polish
 
-- **Scrollbar**: Done — custom mint thin scrollbar on `.xRow`.
+- **Scrollbar**: Gone with the tile scroller — the board is a 3-column grid now,
+  so only the overlay panels scroll.
 - **Missing `designs.ts`**: `veeTiles.css` references `lib/tiles/designs.ts`
   (line 215 comment) but it doesn't exist. Create it with the widget motion
   design SVGs so the `wmArt` class works properly.
 - **Overlay scrollbars**: The `openStage` panels use `overflow: auto` with
-  default browser scrollbars. Style them like the xRow.
+  default browser scrollbars. Give them a slim mint one.
 - **SettingsPanel**: Already simplified, but the "How" / "Make it yours" /
   "Data" tabs could use content polish.
 - **Toast notifications**: No feedback when data is saved. A tiny mint toast

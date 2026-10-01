@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { CORE_TILES, VEE_TILE, DEFAULT_HOME_ORDER, coreDefaultSize, type CoreTile } from '@/lib/tiles/coreTiles'
 import dynamic from 'next/dynamic'
 import { activeGoal as readActiveGoal, allGoals, setActiveGoalId, tileWeights, type Goal } from '@/lib/tiles/weights'
@@ -19,9 +19,9 @@ import type { DashboardChrome } from '@/lib/tiles/dashboardChrome'
  * public/tiles/<slot>.html (from `/tile` or an addon command), or — if the slot
  * is empty — opens the "how to build this" ConnectorOverlay.
  *
- * No auth, no drag/customize, no server. Layout is a pure function of
- * (order, sizes, cols) via the shared packer; the living orbs are animated by
- * initVeeTiles, exactly as in the full app.
+ * No auth, no server. The board is a plain 3-column CSS grid in the user's
+ * order (components/veeTiles.css owns the columns); the living orbs are
+ * animated by initVeeTiles, exactly as in the full app.
  */
 
 // The fixed slot roster (the seeded order + sizes), minus the Library tile.
@@ -129,9 +129,10 @@ function TileFace({
   id: string
   isVee: boolean
   core: CoreTile | null
-  /** Equation layout: explicit size (y = full-width mentor, x = uniform row tile). */
+  /** The mentor only: y is a full-width hero above the grid, so it carries an
+   *  explicit size. The x tiles take their size from their grid cell instead. */
   fixed?: CSSProperties
-  /** Row tiles wobble in edit mode; the mentor (y) never does. */
+  /** Grid tiles wobble in edit mode; the mentor (y) never does. */
   editable?: boolean
   /** Present only in edit mode: shows the ✕ remove badge. */
   onRemove?: () => void
@@ -502,7 +503,6 @@ interface DashboardGridProps {
 export default function DashboardGrid({ userId }: DashboardGridProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
-  const [cols, setCols] = useState(4)
   const [filled, setFilled] = useState<FilledMap>({})
   const [openId, setOpenId] = useState<string | null>(null) // filled slot opened live
   const [connectId, setConnectId] = useState<string | null>(null) // empty slot connector
@@ -544,15 +544,6 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
       document.body.style.overflow = prev
     }
   }, [mentorAlive])
-
-  // Column bucket, matching the CSS: 4 desktop / 2 phone.
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 760px)')
-    const apply = () => setCols(mq.matches ? 2 : 4)
-    apply()
-    mq.addEventListener('change', apply)
-    return () => mq.removeEventListener('change', apply)
-  }, [])
 
   // Discover which slots are filled from the static files committed at
   // public/tiles/<id>.html (the /tile path). The dashboard is local-only — no
@@ -596,21 +587,26 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
   // at build time for YOUR goal; localStorage override wins. See lib/tiles/weights).
   const weights = useMemo(() => (mounted ? tileWeights() : {}), [mounted, goal])
 
-  // The equation row (the x's): every filled slot except the mentor, in the user's
+  // The grid tiles (the x's): every filled slot except the mentor, in the user's
   // saved order, minus anything they removed in edit mode. New tiles append.
-  const rowIds = useMemo(() => {
+  const gridIds = useMemo(() => {
     const base = order.length ? order : SLOT_ORDER
     const seen = new Set(base)
     const all = [...base, ...SLOT_ORDER.filter((id) => !seen.has(id))]
     return all.filter((id) => id !== 'vee' && filled[id] && !removed.includes(id))
   }, [order, filled, removed])
 
+  // The grid as a SET signature. initVeeTiles binds to the DOM, so it only has
+  // to re-run when a tile appears or disappears — a reorder keeps the same
+  // nodes (they are keyed by id), so the orbs keep wandering where they were.
+  const gridKey = useMemo(() => [...gridIds].sort().join(','), [gridIds])
+
   // The live `x =` breakdown: each tile's real-time weight toward the goal.
-  const xPercents = rowIds.map((id) => `${weights[id] ?? 0}%`).join(' · ')
+  const xPercents = gridIds.map((id) => `${weights[id] ?? 0}%`).join(' · ')
   // Flash it whenever anything changes (weights retuned, goal switched, tiles
   // reordered/added), hold 5s, then fade. Keyed on the actual values so it only
   // re-shows on a real change.
-  const xSignature = rowIds.map((id) => `${id}:${weights[id] ?? 0}`).join(',') + '|' + (goal?.id ?? '')
+  const xSignature = gridIds.map((id) => `${id}:${weights[id] ?? 0}`).join(',') + '|' + (goal?.id ?? '')
   useEffect(() => {
     setXPeek(true)
     const t = setTimeout(() => setXPeek(false), 5000)
@@ -638,7 +634,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
   // Drag-reorder: while dragging over a sibling, move the dragged tile there live.
   const moveTo = (src: string, dst: string) => {
     if (src === dst) return
-    const cur = rowIds.slice()
+    const cur = gridIds.slice()
     const from = cur.indexOf(src)
     const to = cur.indexOf(dst)
     if (from < 0 || to < 0) return
@@ -647,11 +643,16 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
     saveOrder(cur)
   }
 
-  // (Re)bind the living orbs whenever the packed layout changes.
+  // (Re)bind the living orbs whenever the SET of tiles on the board changes.
+  // A tile added to a new row is a new DOM node, so initVeeTiles has to run
+  // again for its orb to attach; a removed one lets its orb go with it. The
+  // column count is CSS's business now — resizing reflows the grid without
+  // touching a single node, and the orbs live in SVG user space, so a resize
+  // needs no re-bind.
   useEffect(() => {
     if (!ref.current || !mounted) return
     return initVeeTiles(ref.current, { score: null, showNumber: false })
-  }, [mounted, cols, filledOrder])
+  }, [mounted, gridKey])
 
   // Esc closes any overlay.
   useEffect(() => {
@@ -686,7 +687,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
         scratched ? null : <VisionEmptyState onNewTile={() => setNewOpen(true)} />
       ) : (
         // ── The equation: y on top (the mentor — the output), x + x + x below
-        //    (the inputs — one scrollable row, every tile the same size). ──
+        //    (the inputs — a 3-column grid, every tile the same size). ──
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <style>{`@keyframes goalPop { from { opacity: 0; transform: translateY(12px) scale(.94) } to { opacity: 1; transform: none } }`}</style>
 
@@ -824,39 +825,11 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
             </button>
           </div>
 
-          <div className="xRow"
-            style={{
-              display: 'flex',
-              gap: 16,
-              overflowX: 'auto',
-              paddingBottom: 14,
-              // soften the row's edges: tiles fade out instead of clipping hard
-              WebkitMaskImage:
-                'linear-gradient(to right, transparent 0, #000 18px, #000 calc(100% - 64px), transparent 100%)',
-              maskImage:
-                'linear-gradient(to right, transparent 0, #000 18px, #000 calc(100% - 64px), transparent 100%)',
-              padding: '4px 18px 14px',
-              margin: '0 -18px',
-            }}
-          >
-            {rowIds.map((id, i) => (
-              <Fragment key={id}>
-                {i > 0 && (
-                  <span
-                    aria-hidden
-                    style={{
-                      flex: '0 0 auto',
-                      alignSelf: 'center',
-                      color: 'rgba(110,231,183,.45)',
-                      fontFamily: 'Georgia, "Times New Roman", serif',
-                      fontSize: 30,
-                      fontWeight: 300,
-                    }}
-                  >
-                    +
-                  </span>
-                )}
+          <div className="xGrid">
+            {gridIds.map((id) => (
               <div
+                key={id}
+                className="xCell"
                 draggable={editing}
                 onDragStart={() => {
                   dragId.current = id
@@ -870,13 +843,11 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                 onDragEnd={() => {
                   dragId.current = null
                 }}
-                style={{ flex: '0 0 auto' }}
               >
                 <TileFace
                   id={id}
                   isVee={false}
                   core={CORE_TILES[id as keyof typeof CORE_TILES]}
-                  fixed={{ width: 300, height: 340 }}
                   editable
                   onRemove={editing ? () => saveRemoved([...removed, id]) : undefined}
                   weight={weights[id] ?? 0}
@@ -884,43 +855,10 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                   onOpen={() => openSlot(id)}
                 />
               </div>
-              </Fragment>
             ))}
 
-            {rowIds.length > 0 && (
-              <span
-                aria-hidden
-                style={{
-                  flex: '0 0 auto',
-                  alignSelf: 'center',
-                  color: 'rgba(110,231,183,.45)',
-                  fontFamily: 'Georgia, "Times New Roman", serif',
-                  fontSize: 30,
-                  fontWeight: 300,
-                }}
-              >
-                +
-              </span>
-            )}
-
-            {/* the + tile: same size, transparent — build the next input */}
-            <button
-              type="button"
-              onClick={() => setNewOpen(true)}
-              aria-label="New tile"
-              style={{
-                flex: '0 0 auto',
-                width: 300,
-                height: 340,
-                borderRadius: 20,
-                border: '1px dashed rgba(110,231,183,.35)',
-                background: 'transparent',
-                color: 'var(--mint, #6EE7B7)',
-                fontSize: 46,
-                fontWeight: 300,
-                cursor: 'pointer',
-              }}
-            >
+            {/* the + tile: the same cell, transparent — build the next input */}
+            <button type="button" className="xAdd" onClick={() => setNewOpen(true)} aria-label="New tile">
               +
             </button>
           </div>

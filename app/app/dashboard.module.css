@@ -663,9 +663,9 @@
   /* The dashboard is customizable now: it can hold many tiles and grow past one
      screen, so it scrolls naturally. The OLD one-screen fit locked .page to 100vh
      and forced the grid into 4 collapsible rows (repeat(4, minmax(0,150px))) —
-     that crushed the new flexible grid's rows and made tiles overlap. It is gone.
-     The grid keeps its natural row heights (grid-auto-rows in veeTiles.css); we
-     only cap its width here so the backdrop still breathes on the sides. */
+     that crushed the tile rows and made tiles overlap. It is gone. The board is
+     a real 3-column CSS grid now (components/veeTiles.css), with natural row
+     heights and no horizontal scroll, so all that is left here is the shell. */
   .page.oneScreen {
     padding-top: var(--space-8);
     padding-bottom: var(--space-8);
@@ -673,10 +673,5 @@
   .oneScreen .shell {
     width: 100%;
     gap: var(--space-6);
-  }
-  .oneScreen .shell :global(.veeTiles .grid) {
-    width: 100%;
-    max-width: 1000px;
-    margin-inline: auto;
   }
 }
