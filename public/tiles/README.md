@@ -1,16 +1,37 @@
-# Tile slots — the connector
+# Tiles — the connector
 
-Your dashboard has fixed tile **slots**. A slot is empty until a file exists at:
+A tile is one HTML file at:
 
 ```
-public/tiles/<slot>.html
+public/tiles/<id>.html
 ```
 
-When that file exists, its tile on the dashboard becomes "filled" — clicking the
-tile opens the file live in a sandboxed frame. When it's missing, clicking the tile
-shows the "how to build this" panel instead.
+listed by its id in `public/tiles/manifest.json` (the roster, below). When both
+are there, the tile is "filled" — clicking it opens the file live in a sandboxed
+frame. The board finds tiles from the roster, not from a hardcoded list, so any
+new id works; a tile whose id has no bespoke poster art is drawn as a plain
+neutral face with its name taken from the id.
 
-## The slots
+## The roster
+
+`public/tiles/manifest.json` is the list of tile ids the board looks for. A
+static host cannot list this folder, so a tile file that is not in the manifest
+is simply never found — no error, no tile.
+
+```json
+{ "version": 1, "tiles": ["train", "fuel", "coffee"] }
+```
+
+Adding a tile means **two** edits: the file `public/tiles/<id>.html`, and the
+id in that array. Then press **Re-scan tiles** in the "+ New tile" panel and it
+appears without a reload.
+
+If the manifest is missing or malformed the board falls back to its built-in
+roster and says so in a notice at the top of the board, rather than coming up
+blank. If the manifest names an id whose file is not there, that is reported
+too.
+
+## The slots that ship
 
 | Slot id  | Tile     | File                       |
 |----------|----------|----------------------------|
@@ -45,14 +66,20 @@ By default this saves in the browser. There is no cloud lane — the dashboard i
 local-only — so the data lives in this device's localStorage and stays with the
 device.
 
-## Two ways to fill a slot
+## Two ways to fill a tile
 
 1. **A Patreon episode.** Drop the episode's command into `.claude/commands/` and run
-   it in Claude Code (e.g. `/logger`). It writes the exact slot file for you.
-2. **Build your own.** Run `/tile <slot>` (see `.claude/commands/tile.md`), or ask
-   Claude Code to "build a `<slot>` tile and save it to `public/tiles/<slot>.html`".
+   it in Claude Code (e.g. `/logger`). It writes the exact tile file for you.
+2. **Ask your AI harness.** Open this repo in Claude Code, OpenCode, or any harness
+   and ask for a tile: "build a `coffee` tile and save it to
+   `public/tiles/coffee.html`". Run `/tile <id>` (see `.claude/commands/tile.md`) if
+   the repo's commands are wired up.
 
-Then commit + redeploy (or reload locally) and the tile appears on your dashboard.
+Either way, for a NEW id the harness must also add it to
+`public/tiles/manifest.json` — that is the roster, and without it the file is
+invisible. Then press **Re-scan tiles** in the "+ New tile" panel (or reload) and
+the tile is on the board. Re-scanning never touches your tile order or the tiles
+you removed. Commit the file and the manifest entry so it survives a redeploy.
 
 ## Keeping `tiles-library/` in step
 

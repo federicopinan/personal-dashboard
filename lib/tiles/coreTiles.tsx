@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { TileSize } from './tileSkin'
 import type { DashboardTileStats } from '@/lib/vitality/dashboardStats'
+import { humanizeTileId } from './tileRoster'
 
 /**
  * The core tiles are Vitality's pre-installed apps (Train, Fuel, Vitals, Peak,
@@ -286,9 +287,13 @@ export type HomeTileId = CoreTileId | 'vee' | 'library'
  * tile of its own: it lives inside Fuel, which is what Fuel's one number always
  * was. Every tile drags, resizes, and can be removed. User-built tiles append.
  *
- * Adding a tile here is SAFE for existing boards: DashboardGrid seeds its order
- * from this list only when `vitality:eq:order` is empty, and a saved order
- * always gets anything missing from this list appended rather than dropped.
+ * This is the default ARRANGEMENT, not the roster. Which tiles exist is
+ * public/tiles/manifest.json (see lib/tiles/tileRoster.ts) — so adding an id
+ * here is only about where a tile sits by default, never about whether the
+ * board can find it. Adding one here is SAFE for existing boards:
+ * DashboardGrid seeds its order from this list only when `vitality:eq:order` is
+ * empty, and a saved order always gets anything the roster holds and this list
+ * missed APPENDED rather than dropped.
  */
 export const DEFAULT_HOME_ORDER: HomeTileId[] = [
   'train',
@@ -304,15 +309,48 @@ export const DEFAULT_HOME_ORDER: HomeTileId[] = [
 
 /** Is this id one of the pre-installed core tiles (incl. Vee)? */
 export function isCoreId(id: string): id is CoreTileId | 'vee' {
-  return id === 'vee' || id in CORE_TILES
+  // hasOwnProperty, not `in`: a roster id can be ANY string a harness chose, and
+  // `in` also answers true for Object.prototype members, so an id like
+  // "constructor" would resolve to a function wearing a CoreTile's type.
+  return id === 'vee' || Object.prototype.hasOwnProperty.call(CORE_TILES, id)
 }
 
 /** Is this id any home tile (a core tile, Vee, or the locked Library)? */
 export const isHomeId = (id: string): id is HomeTileId => isLibraryId(id) || isCoreId(id)
 
-/** Default size for any home tile id. Vee defaults to the 2x2 centrepiece. */
-export function coreDefaultSize(id: HomeTileId): TileSize {
-  if (id === 'vee') return 'big'
-  if (id === 'library') return LIBRARY_TILE.defaultSize
-  return CORE_TILES[id].defaultSize
+/**
+ * The descriptor for a core tile, or null for an id the registry does not know.
+ * A tile an AI harness added lives in public/tiles/ and in the roster manifest
+ * without ever being registered here, so every read of CORE_TILES by an id goes
+ * through this: an unknown id is a normal state, not a crash waiting to
+ * white-screen the board.
+ */
+export function coreTileFor(id: string): CoreTile | null {
+  if (!isCoreId(id) || id === 'vee') return null
+  return CORE_TILES[id]
+}
+
+/**
+ * The name to show for any tile id. Known ids keep their registry label; a tile
+ * the registry has never heard of is named after its own id rather than thrown
+ * on, so a board carrying an unregistered tile is still readable.
+ */
+export function tileLabel(id: string): string {
+  if (id === VEE_TILE.id) return VEE_TILE.label
+  return coreTileFor(id)?.label ?? humanizeTileId(id)
+}
+
+/**
+ * The size an id no registry knows gets: the standard band. The fused board
+ * gives every grid cell the same 15:17 ratio and drives it from CSS, so this
+ * only matters to whatever still asks for a default — but it has to be a real
+ * TileSize rather than a throw.
+ */
+const FALLBACK_TILE_SIZE: TileSize = 'm'
+
+/** Default size for any tile id, including one no registry knows. */
+export function coreDefaultSize(id: string): TileSize {
+  if (id === VEE_TILE.id) return 'big'
+  if (isLibraryId(id)) return LIBRARY_TILE.defaultSize
+  return coreTileFor(id)?.defaultSize ?? FALLBACK_TILE_SIZE
 }

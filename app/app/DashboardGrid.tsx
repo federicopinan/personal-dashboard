@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { CORE_TILES, VEE_TILE, DEFAULT_HOME_ORDER, coreDefaultSize, type CoreTile } from '@/lib/tiles/coreTiles'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { VEE_TILE, DEFAULT_HOME_ORDER, coreDefaultSize, coreTileFor, tileLabel, type CoreTile } from '@/lib/tiles/coreTiles'
+import { discoverTiles, humanizeTileId, isTileId, tileFilePath, type RosterProblem, type TileFetcher, type TileRescan, type TileRoster } from '@/lib/tiles/tileRoster'
 import dynamic from 'next/dynamic'
 import { activeGoal as readActiveGoal, allGoals, setActiveGoalId, tileWeights, type Goal } from '@/lib/tiles/weights'
 
@@ -14,20 +15,35 @@ import { withBridge } from '@/lib/tiles/tileBridge'
 import type { DashboardChrome } from '@/lib/tiles/dashboardChrome'
 
 /**
- * The base dashboard grid. Every tile is an inert SLOT: the beautiful poster is
+ * The base dashboard grid. Every tile is an inert slot: the beautiful poster is
  * fixed, and clicking a tile either opens the sealed HTML you dropped into
- * public/tiles/<slot>.html (from `/tile` or an addon command), or — if the slot
+ * public/tiles/<id>.html (from `/tile` or an addon command), or — if the slot
  * is empty — opens the "how to build this" ConnectorOverlay.
+ *
+ * WHICH tiles exist is public/tiles/manifest.json, the roster (lib/tiles/
+ * tileRoster.ts); DEFAULT_HOME_ORDER is only the default ARRANGEMENT a fresh
+ * board starts from. An id the roster names but the core registry
+ * (lib/tiles/coreTiles.tsx) has never heard of is a first-class tile: it gets a
+ * neutral face and a name derived from its id. It is not a broken board, and it
+ * must never throw.
  *
  * No auth, no server. The board is a plain 3-column CSS grid in the user's
  * order (components/veeTiles.css owns the columns); the living orbs are
  * animated by initVeeTiles, exactly as in the full app.
  */
 
-// The fixed slot roster (the seeded order + sizes), minus the Library tile.
-const SLOT_ORDER = DEFAULT_HOME_ORDER.filter((id) => id !== 'library') as string[]
+// The default ARRANGEMENT (the seeded order), minus the Library tile. This is
+// where a fresh board starts, NOT the list of tiles that exist: the roster is
+// public/tiles/manifest.json, written by whoever adds a tile file. This list is
+// the fallback the board runs on when that manifest cannot be read, so a repo
+// that never installed one still boots.
+const DEFAULT_SLOTS = DEFAULT_HOME_ORDER.filter((id) => id !== 'library') as string[]
 
 type FilledMap = Record<string, string> // slotId -> sealed HTML
+
+// One fetch shape for both the mount discovery and a re-scan. no-store, so a
+// re-scan right after the harness wrote a file is never answered from cache.
+const fetchTile: TileFetcher = (url) => fetch(url, { cache: 'no-store' })
 
 /* ── the Vee centre art (wire feeds + ring pulse), animated by veeTilesAnim ── */
 function VeeArt() {
@@ -132,14 +148,18 @@ function TileFace({
   kicker?: string
   onOpen: () => void
 }) {
-  const label = isVee ? VEE_TILE.label : core!.label
-  const index = isVee ? VEE_TILE.index : core!.index
+  // A tile the CORE registry has never heard of (one an AI harness added) has
+  // no descriptor: it gets a name derived from its id, no corner index, no
+  // glyph and no art — a neutral glass face. The old `core!.label` / `core!.art`
+  // threw on exactly this id and took the whole board down with it.
+  const label = isVee ? VEE_TILE.label : (core?.label ?? humanizeTileId(id))
+  const index = isVee ? VEE_TILE.index : core?.index
   const variant = (core?.variant || (isVee ? 'vee' : undefined)) as string | undefined
   const orb = !isVee && core ? core.orb : undefined
   const style: CSSProperties = { position: 'relative', ...fixed }
   return (
     <div
-      data-size={isVee ? coreDefaultSize('vee') : coreDefaultSize(id as Parameters<typeof coreDefaultSize>[0])}
+      data-size={isVee ? coreDefaultSize('vee') : coreDefaultSize(id)}
       data-orb={orb?.mode}
       data-roam={orb?.roam}
       data-pt={orb?.pt}
@@ -148,9 +168,9 @@ function TileFace({
     >
       <div className="aurora" />
 
-      {isVee ? <VeeArt /> : core!.art}
+      {isVee ? <VeeArt /> : core?.art}
 
-      <span className="index">{index}</span>
+      {index && <span className="index">{index}</span>}
       {!isVee && core && <span className="glyph">{core.glyph}</span>}
       {isVee && <span className="kicker">{kicker ?? VEE_TILE.kicker}</span>}
 
@@ -336,8 +356,66 @@ function ConnectorOverlay({ id, label, onClose }: { id: string; label: string; o
   )
 }
 
-/* ── the "+ New tile" panel: dead simple — start with /tile ── */
-function NewTileOverlay({ onClose }: { onClose: () => void; onSaved?: (slot: string, html: string) => void }) {
+/* ── when the roster and the folder disagree, the board says so out loud ── */
+function RosterNotice({ problems }: { problems: RosterProblem[] }) {
+  if (!problems.length) return null
+  return (
+    <div
+      role="status"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+        margin: '0 0 18px',
+        padding: '12px 14px',
+        border: '1px solid var(--border)',
+        borderLeft: '2px solid var(--amber, #E8964A)',
+        borderRadius: 12,
+        background: 'var(--bg-elevated, rgba(255,255,255,.02))',
+      }}
+    >
+      {problems.map((p) => (
+        <p key={p.code} style={{ margin: 0, color: 'var(--muted)', fontSize: 12.5, lineHeight: 1.6 }}>
+          {p.message}
+        </p>
+      ))}
+    </div>
+  )
+}
+
+/* ── the "+ New tile" panel: the tile comes from the AI harness, not from here ──
+   There is no in-app builder and no model call: the tile is an HTML file the
+   user's assistant writes into public/tiles/. This panel's whole job is to say
+   so, point at the real contract (.claude/commands/tile.md), and offer a
+   re-scan so a file that landed a second ago shows up without a page reload. */
+function NewTileOverlay({ onClose, onRescan }: { onClose: () => void; onRescan: () => Promise<TileRescan> }) {
+  const [id, setId] = useState('')
+  const [copied, setCopied] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState<TileRescan | null>(null)
+  const tid = id.trim().toLowerCase()
+  const valid = tid === '' || isTileId(tid)
+  const shown = tid || '<id>'
+
+  const prompt = `Build a "${shown}" tile for my Vitality dashboard as ONE self-contained HTML file (all CSS and JS inline, no external requests). Dark background, mint #6EE7B7. Save and load with await window.Vitality.save(data) and await window.Vitality.load() (the dashboard provides window.Vitality, do not use localStorage). Write it to ${tileFilePath(shown)}, add "${shown}" to the "tiles" array in public/tiles/manifest.json, and follow the sealed tile contract in .claude/commands/tile.md.`
+
+  const copy = () => {
+    navigator.clipboard?.writeText(prompt).then(() => {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1600)
+    })
+  }
+
+  const rescan = async () => {
+    setBusy(true)
+    setResult(null)
+    try {
+      setResult(await onRescan())
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div
       className="openOverlay"
@@ -358,15 +436,146 @@ function NewTileOverlay({ onClose }: { onClose: () => void; onSaved?: (slot: str
             </svg>
           </button>
         </div>
-        <div className="openStage" style={{ display: 'block', overflow: 'auto', padding: '26px 26px 30px' }}>
-          <p style={{ margin: 0, textAlign: 'center', color: 'var(--fg)', fontSize: 22, fontFamily: 'var(--font-serif), Georgia, serif', fontStyle: 'italic' }}>
-            Start with <code style={{ color: 'var(--mint)', fontStyle: 'normal', fontSize: 20 }}>/tile</code>
+        <div className="openStage" style={{ display: 'block', overflow: 'auto', padding: '24px 26px 26px' }}>
+          <p style={{ margin: 0, color: 'var(--fg)', fontSize: 19, fontFamily: 'var(--font-serif), Georgia, serif', fontStyle: 'italic' }}>
+            Your assistant builds it. This board has no in-app builder.
           </p>
-          <p style={{ margin: '12px auto 0', maxWidth: 380, textAlign: 'center', color: 'var(--muted)', fontSize: 13.5, lineHeight: 1.65 }}>
-            In Claude Code, run <code style={{ color: 'var(--mint)' }}>/tile train</code> (or any slot:
-            fuel, vitals, peak, finance). It builds the tile and drops it straight onto your board.
+          <p style={{ margin: '10px 0 0', color: 'var(--muted)', fontSize: 13.5, lineHeight: 1.65 }}>
+            Open this repo in Claude Code, OpenCode, or any AI harness and ask for a tile. It writes
+            the file, the file appears here, and the tile's data stays in this browser.
           </p>
 
+          <ol style={{ margin: '16px 0 0', color: 'var(--muted)', fontSize: 13.5, lineHeight: 1.7, paddingLeft: 18 }}>
+            <li>
+              Give it a name. Lowercase, no spaces: <code style={{ color: 'var(--mint)' }}>coffee</code>,{' '}
+              <code style={{ color: 'var(--mint)' }}>reading</code>, <code style={{ color: 'var(--mint)' }}>guitar</code>.
+            </li>
+            <li style={{ marginTop: 6 }}>
+              It writes <code style={{ color: 'var(--mint)' }}>{tileFilePath(shown)}</code> and adds that id
+              to <code style={{ color: 'var(--mint)' }}>public/tiles/manifest.json</code>. Both, or the
+              board cannot see the tile.
+            </li>
+            <li style={{ marginTop: 6 }}>
+              Come back and press <strong style={{ color: 'var(--fg)' }}>Re-scan tiles</strong>.
+            </li>
+          </ol>
+
+          <p style={{ margin: '14px 0 0', color: 'var(--muted)', fontSize: 12.5, lineHeight: 1.6 }}>
+            A tile is one sealed HTML file: no network, no localStorage, all CSS and JS inline. The exact
+            rules are in <code style={{ color: 'var(--mint)' }}>.claude/commands/tile.md</code> — read that
+            before writing one.
+          </p>
+
+          <label style={{ display: 'block', marginTop: 18, color: 'var(--muted)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase' }}>
+            Tile name
+            <input
+              value={id}
+              onChange={(e) => setId(e.target.value)}
+              placeholder="coffee"
+              spellCheck={false}
+              autoComplete="off"
+              style={{
+                display: 'block',
+                width: '100%',
+                marginTop: 7,
+                padding: '11px 13px',
+                borderRadius: 12,
+                border: `1px solid ${valid ? 'var(--border)' : 'var(--amber, #E8964A)'}`,
+                background: 'var(--bg-elevated, #0b0f0d)',
+                color: 'var(--fg)',
+                fontFamily: 'ui-monospace, Menlo, monospace',
+                fontSize: 14,
+              }}
+            />
+          </label>
+          {!valid && (
+            <p style={{ margin: '6px 0 0', color: 'var(--amber, #E8964A)', fontSize: 12 }}>
+              Lowercase letters, digits, dot and dash only — the name becomes the file name.
+            </p>
+          )}
+
+          <pre
+            style={{
+              margin: '12px 0 0',
+              background: 'var(--bg-elevated, #0b0f0d)',
+              border: '1px solid var(--border)',
+              borderRadius: 12,
+              padding: '12px 14px',
+              whiteSpace: 'pre-wrap',
+              color: 'var(--fg)',
+              fontSize: 12.5,
+              lineHeight: 1.55,
+            }}
+          >
+            {prompt}
+          </pre>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 16 }}>
+            <button
+              type="button"
+              onClick={copy}
+              style={{
+                padding: '0.65rem 1.2rem',
+                borderRadius: 999,
+                background: 'var(--mint)',
+                color: 'var(--mint-ink, #042a1c)',
+                fontWeight: 600,
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              {copied ? 'Copied ✓' : 'Copy build prompt'}
+            </button>
+            <button
+              type="button"
+              onClick={rescan}
+              disabled={busy}
+              style={{
+                padding: '0.65rem 1.2rem',
+                borderRadius: 999,
+                background: 'transparent',
+                color: 'var(--mint)',
+                border: '1px solid var(--border)',
+                fontWeight: 600,
+                cursor: busy ? 'progress' : 'pointer',
+                opacity: busy ? 0.6 : 1,
+              }}
+            >
+              {busy ? 'Scanning…' : 'Re-scan tiles'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                padding: '0.65rem 1.2rem',
+                borderRadius: 999,
+                background: 'transparent',
+                color: 'var(--muted)',
+                border: 'none',
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              Close
+            </button>
+          </div>
+
+          {result && (
+            <div role="status" style={{ marginTop: 14, color: 'var(--muted)', fontSize: 12.5, lineHeight: 1.65 }}>
+              {result.added.length > 0 ? (
+                <p style={{ margin: 0, color: 'var(--fg)' }}>
+                  On the board now: {result.added.map((a) => tileLabel(a)).join(', ')}.
+                </p>
+              ) : (
+                <p style={{ margin: 0 }}>Nothing new. The board has every tile the manifest lists.</p>
+              )}
+              {result.problems.map((p) => (
+                <p key={p.code} style={{ margin: '8px 0 0', color: 'var(--amber, #E8964A)' }}>
+                  {p.message}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -503,6 +712,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
   const [newOpen, setNewOpen] = useState(false) // "+ New tile" creator
   const [showWelcome, setShowWelcome] = useState(false) // transient "see the vision" home (non-destructive)
   const [loaded, setLoaded] = useState(false) // tile discovery finished — gates the blank "see the vision" state
+  const [roster, setRoster] = useState<TileRoster>({ ids: DEFAULT_SLOTS, problems: [] }) // the manifest's ids + anything wrong with it
   const [scratched, setScratched] = useState(false) // deliberate "start from scratch" → clean canvas, no onboarding text
   const [editing, setEditing] = useState(false) // edit mode: row tiles wobble, show ✕, drag to reorder
   const [order, setOrder] = useState<string[]>([]) // persisted row order (x tiles)
@@ -511,6 +721,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
   const [mentorAlive, setMentorAlive] = useState(false) // the mentor comes to life OVER the board — no page load
   const [xPeek, setXPeek] = useState(true) // the `x = %s` breakdown: flashes on change, fades after 5s (the `x` stays)
   const dragId = useRef<string | null>(null)
+  const filledRef = useRef<FilledMap>({})
 
   const { register, unregister } = useTileHost(userId, undefined, () => {})
 
@@ -551,31 +762,18 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
     }
   }, [mentorAlive])
 
-  // Discover which slots are filled from the static files committed at
-  // public/tiles/<id>.html (the /tile path). The dashboard is local-only — no
-  // cloud tile source, no override layer; whichever file is in the repo is
-  // the tile that ships.
+  // Discover which tiles exist. The roster is public/tiles/manifest.json — the
+  // list of ids written by whoever added a tile file — and each id is then read
+  // from public/tiles/<id>.html. A non-ok response means "no tile for this id".
+  // The dashboard is local-only: no cloud tile source, no override layer, and
+  // whichever file is in the repo is the tile that ships.
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const pairs = await Promise.all(
-        SLOT_ORDER.map(async (id) => {
-          try {
-            const res = await fetch(`/tiles/${id}.html`, { cache: 'no-store' })
-            if (!res.ok) return null // 404 → slot is empty
-            const html = await res.text()
-            if (!html.trim()) return null
-            return [id, html] as const
-          } catch {
-            return null
-          }
-        }),
-      )
-      const map: FilledMap = {}
-      for (const p of pairs) if (p) map[p[0]] = p[1]
-
+      const scan = await discoverTiles(fetchTile, DEFAULT_SLOTS)
       if (alive) {
-        setFilled(map)
+        setFilled(scan.html)
+        setRoster({ ids: scan.ids, problems: scan.problems })
         setLoaded(true)
       }
     })()
@@ -584,23 +782,41 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
     }
   }, [])
 
+  // Re-scan without a reload, for a tile the user's harness just wrote. It
+  // re-reads the manifest and the tile files and REPLACES `filled` — the folder
+  // is the truth, so a deleted tile disappears too. It touches nothing else:
+  // `order` and `removed` are read from storage once, on mount, and are never
+  // written here, so vitality:eq:order and vitality:eq:removed come through a
+  // re-scan exactly as they were, and a new id is APPENDED to the board instead
+  // of being pushed into the saved order.
+  const rescan = useCallback(async (): Promise<TileRescan> => {
+    const scan = await discoverTiles(fetchTile, DEFAULT_SLOTS)
+    const added = scan.ids.filter((id) => scan.html[id] && !filledRef.current[id])
+    filledRef.current = scan.html
+    setFilled(scan.html)
+    setRoster({ ids: scan.ids, problems: scan.problems })
+    return { added, problems: scan.problems }
+  }, [])
+
   // The board shows ONLY tiles that actually exist. A fresh scaffold has none, so
   // it boots to the blank "see the vision" canvas; tiles appear as they're built
   // (/tile), shipped by an episode command (/logger), or installed (/vitality).
-  const filledOrder = useMemo(() => SLOT_ORDER.filter((id) => filled[id]), [filled])
+  const filledOrder = useMemo(() => roster.ids.filter((id) => filled[id]), [filled, roster.ids])
 
   // Each input's estimated share of the goal (plain numbers — Claude retunes them
   // at build time for YOUR goal; localStorage override wins. See lib/tiles/weights).
   const weights = useMemo(() => (mounted ? tileWeights() : {}), [mounted, goal])
 
-  // The grid tiles (the x's): every filled slot except the mentor, in the user's
-  // saved order, minus anything they removed in edit mode. New tiles append.
+  // The grid tiles (the x's): every filled tile except the mentor, in the user's
+  // saved order, minus anything they removed in edit mode. New tiles append —
+  // an id the saved order never mentions is added at the end, not dropped, and
+  // the saved order itself is left exactly as the user left it.
   const gridIds = useMemo(() => {
-    const base = order.length ? order : SLOT_ORDER
+    const base = order.length ? order : DEFAULT_SLOTS
     const seen = new Set(base)
-    const all = [...base, ...SLOT_ORDER.filter((id) => !seen.has(id))]
+    const all = [...base, ...roster.ids.filter((id) => !seen.has(id))]
     return all.filter((id) => id !== 'vee' && filled[id] && !removed.includes(id))
-  }, [order, filled, removed])
+  }, [order, filled, removed, roster.ids])
 
   // The grid as a SET signature. initVeeTiles binds to the DOM, so it only has
   // to re-run when a tile appears or disappears — a reorder keeps the same
@@ -662,16 +878,17 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
 
   // Esc closes any overlay.
   useEffect(() => {
-    if (!openId && !connectId) return
+    if (!openId && !connectId && !newOpen) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setOpenId(null)
         setConnectId(null)
+        setNewOpen(false)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [openId, connectId])
+  }, [openId, connectId, newOpen])
 
   if (!mounted) return null
 
@@ -681,12 +898,16 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
     else setConnectId(id)
   }
 
-  const labelFor = (id: string) => (id === 'vee' ? VEE_TILE.label : CORE_TILES[id as keyof typeof CORE_TILES].label)
+  // Null-safe: a tile the core registry has never heard of is named after its
+  // own id. The old lookup indexed CORE_TILES with the raw id and threw on
+  // anything outside the union, which white-screened the whole board.
+  const labelFor = (id: string) => tileLabel(id)
 
   const isEmpty = filledOrder.length === 0
 
   return (
     <div className={`veeTiles${editing ? ' editing' : ''}`} ref={ref}>
+      {loaded && <RosterNotice problems={roster.problems} />}
       {!loaded ? null : isEmpty ? (
         // A fresh board shows the onboarding vision; a deliberately-scratched board
         // stays clean — just header + background, nothing in the middle.
@@ -859,7 +1080,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                 <TileFace
                   id={id}
                   isVee={false}
-                  core={CORE_TILES[id as keyof typeof CORE_TILES]}
+                  core={coreTileFor(id)}
                   editable
                   onRemove={editing ? () => saveRemoved([...removed, id]) : undefined}
                   weight={weights[id] ?? 0}
@@ -894,7 +1115,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
       {newOpen && (
         <NewTileOverlay
           onClose={() => setNewOpen(false)}
-          onSaved={(slot, html) => setFilled((prev) => ({ ...prev, [slot]: html }))}
+          onRescan={rescan}
         />
       )}
 

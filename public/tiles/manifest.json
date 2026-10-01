@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "tiles": [
+    "train",
+    "fuel",
+    "vitals",
+    "sleep",
+    "screen",
+    "vee",
+    "peak",
+    "finance"
+  ]
+}

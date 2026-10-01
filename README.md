@@ -72,17 +72,26 @@ Then open http://localhost:3000. Requires Node 20+ (see `.nvmrc`).
 
 ## Filling the tiles
 
-Click any tile and it opens a panel telling you how to build it. Each tile is a slot
-that fills when a file exists at `public/tiles/<slot>.html`. Two ways to fill one:
+Click any tile and it opens a panel telling you how to build it. A tile fills when a
+file exists at `public/tiles/<id>.html` **and** that id is listed in
+`public/tiles/manifest.json` — the roster the board reads, because a static host
+cannot list a folder. Two ways to fill one:
 
-- **Use predefined library tiles.** Copy any tile from `tiles-library/` into `public/tiles/<slot>.html`.
-- **Build custom tiles.** Run `/tile <slot>` or create a `<slot>` tile and save it to `public/tiles/<slot>.html`.
+- **Use predefined library tiles.** Copy any tile from `tiles-library/` into `public/tiles/<id>.html`.
+- **Build custom tiles.** Open this repo in Claude Code, OpenCode, or any AI harness and
+  ask for a tile, or run `/tile <id>`. The harness writes the file and adds the id to the
+  manifest; then press **Re-scan tiles** in the "+ New tile" panel — no reload, no rebuild.
+
+Any id works. A tile whose id has no bespoke poster art in `lib/tiles/coreTiles.tsx` is drawn
+as a plain neutral face labelled from its id, so a new tile is a real tile the moment its
+file and manifest entry land.
 
 A tile is one self-contained HTML file. It saves its own data through the dashboard
 bridge, `window.Vitality.save()` and `window.Vitality.load()`, which the dashboard
-provides. Full contract: [`public/tiles/README.md`](public/tiles/README.md).
+provides. Full contract: [`public/tiles/README.md`](public/tiles/README.md) and
+[`.claude/commands/tile.md`](.claude/commands/tile.md).
 
-The slots: `train`, `fuel`, `vitals`, `sleep`, `vee`, `peak`, `finance`.
+The tiles that ship: `train`, `fuel`, `vitals`, `sleep`, `screen`, `vee`, `peak`, `finance`.
 
 `tiles-library/` is the source these are copied FROM. Editing a tile means
 editing `public/tiles/<slot>.html` and copying the change back
