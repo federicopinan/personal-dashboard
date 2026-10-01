@@ -42,7 +42,7 @@ version. Say so before running it, and only copy the slots they actually want re
 
 ## Step 2 — Look at it
 
-Tell them to **reload http://localhost:3000** (or start it with `npm run dev` if it isn't running). The
+Tell them to **reload http://localhost:3000** (or start it with `pnpm dev` if it isn't running). The
 blank "see the vision" board is now the **full Vitality dashboard** — every tile filled and live. Clicking
 a tile opens the real thing.
 

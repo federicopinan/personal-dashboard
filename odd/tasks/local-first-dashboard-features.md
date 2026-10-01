@@ -15,6 +15,7 @@ The dashboard already supports local tiles, goals, notes, and daily tasks, but l
 - Generated artifacts excluded from authored-line forecasts. Forecast: approximately 850–1,450 authored changed lines across all tasks; advisory only, with no cosmetic line reduction.
 - Delivery preference: `single-pr` from the session preflight. No PR or remote operation is authorized by this document.
 - User selected pnpm instead of npm for dependency setup and build verification. The existing `package-lock.json` must be imported to pnpm format before a reproducible pnpm install; do not silently discard existing lock history.
+- **Later, explicit decision:** the npm lockfile was retired outright. `package.json` now pins `"packageManager": "pnpm@12.8.1"`, `pnpm-lock.yaml` is the single lockfile, and `package-lock.json` was deleted. The lock history it was imported from survives only in git history. The motivation was the Netlify build: two lockfiles with no `packageManager` field made the deploy ambiguous. This supersedes the caution above rather than being a silent discard.
 
 ## TDD and Verification
 - TDD: **off**, explicitly selected by the user.

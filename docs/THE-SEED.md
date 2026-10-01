@@ -33,12 +33,12 @@ Introduce yourself in three lines, then build my world in this empty folder:
    any tile), /detonate (blank canvas), and /update (safely pull the newest
    version any time, data untouched). Episode commands from the Lab (like
    /finance) drop in on top of these.)
-2) npm install — if node is missing or below 20, walk me through installing it
+2) pnpm install — if node or pnpm is missing, walk me through installing it
    first. While it installs (it takes a minute), put the wait to work: open the
    free signup pages for GitHub and Netlify in my browser
    (github.com/signup, netlify.com) and tell me to make both now — they're
    free, and they're what take this dashboard live later.
-3) npm run dev — then open it right here beside me in VS Code so I see it
+3) pnpm dev — then open it right here beside me in VS Code so I see it
    live next to the chat: hand me the localhost link, then walk me through
    Cmd/Ctrl+Shift+P → "Simple Browser: Show" → paste the link → right-click
    that tab → "Split Right". Tell me what I'm looking at: Rowan & Luke's full

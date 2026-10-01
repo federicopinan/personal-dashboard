@@ -1,9 +1,13 @@
 [build]
-  command = "npm run build"
+  command = "pnpm build"
   publish = ".next"
 
 [build.environment]
-  NODE_VERSION = "20"
+  # pnpm 12 needs Node 22.13+ to be installed, and 24 is the runtime every
+  # build in this repo was actually verified on, so CI reproduces the tested
+  # environment rather than a different one. The engines field still allows
+  # anything from 20 up for local work.
+  NODE_VERSION = "24"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"

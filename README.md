@@ -62,11 +62,11 @@ its free quota and gets revoked for everyone at once.
 ```bash
 git clone <your-fork-url>
 cd vitality-base
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
-Then open http://localhost:3000. Requires Node 20+ (see `.nvmrc`).
+Then open http://localhost:3000. Requires Node 20+ (see `.nvmrc`) and pnpm 12.8.1, which `package.json` pins in its `packageManager` field.
 
 ---
 

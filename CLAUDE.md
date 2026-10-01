@@ -71,7 +71,7 @@ them and whether it's optional, then let them choose.
 
 ```
 # My road to done
-- [ ] 1. The board, locally — npm install + npm run dev            REQUIRED
+- [ ] 1. The board, locally — pnpm install + pnpm dev               REQUIRED
        → your dashboard, running on this computer
 - [ ] 2. GitHub — gh auth login (one browser sign-in; I do the git) RECOMMENDED
        → your code is saved and safe; the door to going live

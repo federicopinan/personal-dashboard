@@ -40,14 +40,14 @@ rules:
     - Follow existing code patterns
     tdd: false
   verify:
-    build_command: "npm run build"
+    build_command: "pnpm build"
     coverage_threshold: 0
   archive:
     - Warn before merging destructive deltas
 
 testing:
   strict_tdd: false
-  runner: "npm"
+  runner: "pnpm"
   unit: false
   integration: false
   e2e: false
@@ -58,13 +58,13 @@ testing:
 
 # NOTE on tests + verification: this project ships no automated test suite
 # today. There is no `test_command`. Verification work is done by hand (a
-# browser check of the running dashboard) and by `npm run build`, which is
+# browser check of the running dashboard) and by `pnpm build`, which is
 # the authoritative gate — it runs the TypeScript compiler and catches
-# broken imports. `npm run lint` is wired in `package.json` but the project
+# broken imports. `pnpm lint` is wired in `package.json` but the project
 # ships no ESLint config, so on a fresh clone the script triggers Next.js's
 # first-time interactive setup wizard (it asks the user to pick an ESLint
 # style). Until an `.eslintrc*` or `eslint.config.*` is committed, do NOT
-# claim `npm run lint` works in CI — it does not, and asserting the
+# claim `pnpm lint` works in CI — it does not, and asserting the
 # opposite would block a clean clone. If/when a config is added, set
 # `linter: true` here and add the script to the verification contract at
 # the same time so config never references a working script that does
