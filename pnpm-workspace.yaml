@@ -1,0 +1,17 @@
+# pnpm reads its settings from here, not from package.json, as of pnpm 11 —
+# `onlyBuiltDependencies` and `ignoredBuiltDependencies` were removed in favour
+# of `allowBuilds`. This file exists only to carry that one setting; there is no
+# workspace and no `packages:` key on purpose.
+#
+# Why the entry is needed at all: pnpm 10+ refuses to run a dependency's build
+# script unless it is listed here, and it fails the whole install with
+# ERR_PNPM_IGNORED_BUILDS when one was merely skipped. Netlify runs a plain
+# `pnpm install`, so an unlisted package is a red build, not a warning.
+#
+# unrs-resolver ships a native binding built in postinstall. It arrives
+# transitively through eslint-config-next -> eslint-import-resolver-typescript.
+# It is allowed rather than denied so that adding an ESLint config later cannot
+# land on a missing native binding. Today nothing runs it: the repo ships no
+# ESLint config, so `next build` skips linting entirely.
+allowBuilds:
+  unrs-resolver: true

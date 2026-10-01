@@ -3,11 +3,11 @@
   publish = ".next"
 
 [build.environment]
-  # pnpm 12 needs Node 22.13+ to be installed, and 24 is the runtime every
-  # build in this repo was actually verified on, so CI reproduces the tested
-  # environment rather than a different one. The engines field still allows
-  # anything from 20 up for local work.
-  NODE_VERSION = "24"
+  # Node is resolved from .nvmrc, not from here — a .nvmrc present in the repo
+  # takes precedence over NODE_VERSION, so setting it to anything else is inert
+  # and quietly misleading. Keep the two in step, or delete the line and let
+  # .nvmrc be the single source of truth.
+  NODE_VERSION = "20"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
