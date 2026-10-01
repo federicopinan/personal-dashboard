@@ -25,6 +25,8 @@ export type CoreTileId =
   | 'fuel'
   | 'vitals'
   | 'sleep'
+  | 'screen'
+  | 'water'
   | 'peak'
   | 'finance'
 
@@ -147,6 +149,60 @@ export const CORE_TILES: Record<CoreTileId, CoreTile> = {
       </svg>
     ),
   },
+  screen: {
+    id: 'screen',
+    href: '/app/starter',
+    index: '08',
+    label: 'Screen',
+    // The orb rests mid-panel and walks out to the bezel corners: 'spoke'
+    // reads the x2/y2 endpoint of every .motd element, so the bezel is four
+    // <line>s and the glow traces the frame. The first core tile on this mode —
+    // a screen is the one input on the board that actually has a frame.
+    orb: { mode: 'still', roam: 'spoke', pt: '105,126' },
+    defaultSize: 'm',
+    glyph: (
+      <svg viewBox="-12 -12 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round">
+        <rect x="-9" y="-8" width="18" height="12" rx="1.6" />
+        <path d="M0 4 L0 7.5" />
+        <path d="M-4 7.5 L4 7.5" />
+      </svg>
+    ),
+    art: (
+      <svg className="art" viewBox="0 0 210 250">
+        <line className="motd" x1="52" y1="88" x2="158" y2="88" />
+        <line className="motd" x1="158" y1="88" x2="158" y2="164" />
+        <line className="motd" x1="158" y1="164" x2="52" y2="164" />
+        <line className="motd" x1="52" y1="164" x2="52" y2="88" />
+        <path className="mot" d="M105 164 L105 186 M84 186 L126 186" />
+        <path className="mot" d="M68 126 L142 126" />
+        <g className="orb"><circle className="glow" r="9" /><circle className="node" r="3.4" /></g>
+      </svg>
+    ),
+  },
+  water: {
+    id: 'water',
+    href: '/app/starter',
+    index: '09',
+    label: 'Water',
+    // The orb walks down the glass wall, then swaps to the water line inside
+    // it: the same two-path 'wander' the Sleep tile uses for its ring and its
+    // pillow, on a path pair that is unmistakably a drink.
+    orb: { mode: 'wander' },
+    defaultSize: 's',
+    glyph: (
+      <svg viewBox="-12 -12 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round">
+        <path d="M-6 -8 L6 -8 L4.5 8 L-4.5 8 Z" />
+        <path d="M-5.4 -3 L5.4 -3" />
+      </svg>
+    ),
+    art: (
+      <svg className="art" viewBox="0 0 210 250">
+        <path className="mot" d="M64 92 L73 198 L137 198 L146 92" />
+        <path className="motd" d="M68 150 Q80 142 92 150 T116 150 T140 150" />
+        <g className="orb"><circle className="glow" r="10" /><circle className="node" r="3.4" /></g>
+      </svg>
+    ),
+  },
   peak: {
     id: 'peak',
     href: '/app/starter',
@@ -250,8 +306,10 @@ export type HomeTileId = CoreTileId | 'vee' | 'library'
  * 2-wide band high in the second row (the always-on "your apps" shelf, the
  * platform's front door; building and uploading tiles live inside it), Vee the
  * 2x2 centre, talls down the sides, Finance a 2-wide band at the foot. Sleep
- * sits beside Vitals because it feeds it. Every tile drags, resizes, and can be
- * removed. User-built tiles append.
+ * sits beside Vitals because it feeds it, Screen goes straight after it because
+ * that pairing is the whole reason Screen exists, and Water follows as the
+ * second half of what the Fuel stub was really logging. Every tile drags,
+ * resizes, and can be removed. User-built tiles append.
  *
  * Adding a tile here is SAFE for existing boards: DashboardGrid seeds its order
  * from this list only when `vitality:eq:order` is empty, and a saved order
@@ -263,6 +321,8 @@ export const DEFAULT_HOME_ORDER: HomeTileId[] = [
   'library',
   'vitals',
   'sleep',
+  'screen',
+  'water',
   'vee',
   'peak',
   'finance',

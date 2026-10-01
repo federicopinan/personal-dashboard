@@ -95,7 +95,7 @@ export function useTileHost(
       // whitelisted to the data slots (never 'vee' or internals).
       if (msg.type === 'read') {
         const slot = String(msg.slot || '')
-        const READABLE = ['train', 'fuel', 'vitals', 'sleep', 'peak', 'finance']
+        const READABLE = ['train', 'fuel', 'vitals', 'sleep', 'screen', 'water', 'peak', 'finance']
         if (!READABLE.includes(slot)) {
           src.postMessage({ source: 'vitality-host', type: 'read:error', id: msg.id, reason: 'slot_not_allowed' }, '*')
           return

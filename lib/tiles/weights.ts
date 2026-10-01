@@ -47,26 +47,55 @@ export interface Notice {
   deltas?: { tile: string; from: number; to: number }[]
 }
 
+/**
+ * The shipped weights, per goal.
+ *
+ * SCREEN and WATER arrived together, and every goal was REBALANCED rather than
+ * extended: eight inputs cannot share 100% with two appended to the old six, so
+ * the numbers below were taken out of the inputs each new tile competes with.
+ * The reasoning, so a later retune does not have to reverse-engineer it:
+ *
+ * - SCREEN is a COST, and it is the mentor's own stated reason for wanting the
+ *   tile ("SOC + trading = you LIVE on screens"). So it earns its share from the
+ *   goals whose work IS the screen: highest on trader, next on soc-analyst,
+ *   lowest on jacked, where the screen is incidental to the goal.
+ * - WATER is small everywhere. It is a background input: real, cheap to log, and
+ *   not what any of these three goals is actually about. It is worth the most
+ *   where recovery is already being watched (jacked, overall) and least where
+ *   the goal is measured in hours at a screen.
+ *
+ * A saved goal gets both keys filled in automatically (withShippedWeights only
+ * fills ABSENT keys), but its OTHER weights stay exactly as the user last set
+ * them — a stored goal is not retroactively rescaled by this table, and one
+ * should not be: the mentor retunes the user's own numbers, not this file.
+ */
 export const DEFAULT_GOALS: Goal[] = [
   {
     id: 'soc-analyst',
     title: 'SOC Blue Team analyst',
     accent: '#00D4FF',
-    weights: { train: 4, fuel: 4, vitals: 20, sleep: 12, peak: 5, finance: 55 },
+    // screen 6, water 2 come out of finance (which is where a screen-bound
+    // analyst spends the time finance used to stand in for).
+    weights: { train: 4, fuel: 4, vitals: 19, sleep: 12, screen: 6, water: 2, peak: 5, finance: 48 },
     progress: 5,
   },
   {
     id: 'jacked',
     title: 'Get jacked',
     accent: '#FF6B6B',
-    weights: { train: 45, fuel: 26, vitals: 12, sleep: 12, peak: 5 },
+    // screen 2 (incidental here), water 6 (recovery-adjacent, and the one the
+    // mentor already listed as this goal's idea) — paid for by fuel, the input
+    // hydration most overlaps.
+    weights: { train: 43, fuel: 20, vitals: 12, sleep: 12, screen: 2, water: 6, peak: 5 },
     progress: 10,
   },
   {
     id: 'trader',
     title: 'Professional trader',
     accent: '#FFD700',
-    weights: { train: 4, fuel: 4, vitals: 8, sleep: 7, peak: 5, finance: 72 },
+    // screen 8 is the highest anywhere, and out of finance: the screen IS the
+    // trading desk, so screen time is the honest proxy finance was carrying.
+    weights: { train: 4, fuel: 4, vitals: 8, sleep: 7, screen: 8, water: 2, peak: 5, finance: 62 },
     progress: 5,
   },
 ]
@@ -77,7 +106,9 @@ export const OVERALL_GOAL: Goal = {
   id: 'overall',
   title: "A SOC analyst who's jacked and trades",
   accent: '#00D4FF',
-  weights: { train: 17, fuel: 9, vitals: 16, sleep: 10, peak: 5, finance: 43 },
+  // The synthesis, so screen lands between soc-analyst and trader, and water
+  // between overall and jacked.
+  weights: { train: 16, fuel: 8, vitals: 15, sleep: 10, screen: 6, water: 4, peak: 5, finance: 36 },
   progress: 5,
 }
 
@@ -128,15 +159,14 @@ export interface TileIdea {
 export const DEFAULT_IDEAS: Record<string, TileIdea[]> = {
   // No Sleep idea here any more: the Sleep tile ships with the board, so
   // suggesting it would be the mentor asking for something you already have.
-  overall: [
-    {
-      word: 'Screen',
-      title: 'Screen time',
-      tracks: 'hours staring at screens vs sleep',
-      why: 'SOC + trading = you LIVE on screens. Tracking it keeps the burnout away.',
-      estWeight: 6,
-    },
-  ],
+  // Same for the two that arrived with it. The Screen idea used to sit here and
+  // the Water idea sat under `jacked`; both tiles now ship, so both are gone for
+  // the same reason. What is left in this file is a list of what the board is
+  // STILL missing — that is the whole job of it, and a gap the user has since
+  // closed is not a gap any more. `overall` is kept as an empty array rather than
+  // deleted so tileIdeas' `?? DEFAULT_IDEAS.overall` fallback still resolves to
+  // an array for an unknown goal id instead of changing what it returns.
+  overall: [],
   'soc-analyst': [
     {
       word: 'Labs',
@@ -154,13 +184,6 @@ export const DEFAULT_IDEAS: Record<string, TileIdea[]> = {
     },
   ],
   jacked: [
-    {
-      word: 'Water',
-      title: 'Water',
-      tracks: 'daily intake vs target',
-      why: 'The gym alone won\'t get you jacked. Water is the cheapest compound lift you\'re not tracking.',
-      estWeight: 8,
-    },
     {
       word: 'Steps',
       title: 'Steps / NEAT',

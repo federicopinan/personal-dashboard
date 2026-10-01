@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#050505" />
+<title>Screen time</title>
+<!--
+  SCREEN TIME — hours on screens, one number a day. Logged on the same 0.5h step
+  the Sleep tile uses, and a bar per day so a week of screen time is visible
+  instead of guessed at.
+
+  WHY THIS TILE IS A PAIR, NOT A STALONE NUMBER. The board already logs sleep,
+  and the gap this fills was always the other half of that: hours on a screen
+  next to hours asleep. So the pairing is a FACT shown side by side, nothing
+  more. There is deliberately NO correlation here — no ratio, no "you slept
+  less on heavy days", no verdict of any kind. Two numbers, both sourced, both
+  dated. The read is one line of the Sleep store under the same night
+  convention, and if the read fails the tile says so instead of quietly showing
+  a zero (see the load() rejection path below).
+
+  THE DAY IS THE KEY, and that is the ONE place this tile differs from Sleep on
+  purpose. A night's hours belong to the night they BEGAN, so Sleep shifts a key
+  back one day. Screen hours are a property of a day the user was awake for, so
+  they live under that day, unshifted. Both tiles use the same addDays/shiftKey
+  primitives so the two conventions can never drift into the same file.
+
+  SCALE: a fixed 0–16h domain, with the reference line at 8h. A fixed domain is
+  the only way an 8h line keeps meaning the same thing every evening; an
+  auto-fitting axis would move the goalposts under the one line the user is
+  actually reading. A 0h day draws a stub and a day with no entry draws a faint
+  tick — a zero and an absence are different facts, which is why normHours
+  accepts a real 0 and refuses to invent one.
+
+  Sealed: no network, no imports, no bundler. window.Vitality is the host's.
+
+  The PURE:BEGIN/PURE:END block below is dependency-free by construction so the
+  date + scale math can be exercised outside a browser. Do not put DOM or bridge
+  calls inside it.
+-->
+<style>
+  :root{
+    --fg:#ffffff;
+    --mint:#6EE7B7;
+    --mint-hi:#d4fce8;
+    --mint-deep:#1f4d3d;
+    --mint-glow:rgba(110,231,183,0.5);
+    --amber:#F59E0B;
+    --amber-soft:rgba(245,158,11,0.16);
+    --iris:#a78bfa;
+    --muted:rgba(255,255,255,0.5);
+    --muted-strong:rgba(255,255,255,0.7);
+    --border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.14);
+    --card:rgba(255,255,255,0.02);
+    --card-elev:rgba(255,255,255,0.04);
+    --ease-premium:cubic-bezier(0.16,1,0.3,1);
+    --ease-soft:cubic-bezier(0.22,1,0.36,1);
+    --font-serif:'Instrument Serif',Georgia,'Times New Roman',serif;
+    --font-mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+    --r-lg:20px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#050505;color:var(--fg);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  body{padding:22px 16px 44px;position:relative;overflow-x:hidden}
+  ::selection{background:rgba(110,231,183,0.28);color:#fff}
+  .atmo{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .atmoGlow{position:absolute;left:50%;top:30%;width:820px;height:820px;transform:translate(-50%,-50%);
+    background:radial-gradient(circle,rgba(110,231,183,0.09),transparent 62%);animation:atmoBreath 11s ease-in-out infinite}
+  @keyframes atmoBreath{0%,100%{opacity:.7;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.07)}}
+  .mote{position:absolute;width:2px;height:2px;border-radius:999px;background:var(--mint);opacity:0;animation:moteDrift linear infinite}
+  @keyframes moteDrift{0%{opacity:0;transform:translateY(16px)}15%{opacity:.45}85%{opacity:.3}100%{opacity:0;transform:translateY(-110px)}}
+  .wrap{position:relative;z-index:1;max-width:560px;margin:0 auto}
+
+  .hero{margin:4px 2px 26px;animation:fadeUp 700ms var(--ease-premium) both}
+  .heroTitle{font-family:var(--font-serif);font-size:clamp(30px,5.2vw,44px);line-height:1.02;font-weight:400;letter-spacing:-0.01em}
+  .heroTitle em{color:var(--mint);font-style:italic}
+  .heroDate{font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--muted);margin-top:10px}
+
+  .card{padding:1.4rem;border-radius:var(--r-lg);border:1px solid var(--border);background:var(--card);
+    display:flex;flex-direction:column;gap:16px;transition:border-color .2s,box-shadow .2s;margin-bottom:14px}
+  .card:hover{border-color:rgba(110,231,183,0.2);box-shadow:0 0 30px -20px var(--mint-glow)}
+  @media (max-width:520px){.card{padding:16px;gap:14px}}
+  .eyebrow{font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted-strong)}
+  .eyebrow.mint{color:var(--mint)}
+
+  /* the log */
+  .lastNight{text-align:center;padding:6px 0 2px}
+  .lnVal{font-family:var(--font-serif);font-style:italic;font-size:clamp(46px,12vw,64px);line-height:1;color:#fff;
+    font-variant-numeric:tabular-nums;text-shadow:0 0 40px rgba(110,231,183,0.2)}
+  .lnVal.none{color:var(--muted);text-shadow:none;font-size:clamp(26px,7vw,34px)}
+  .lnLab{font-family:var(--font-mono);font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-top:10px}
+  .stepRow{display:flex;align-items:center;justify-content:center;gap:18px}
+  .step{width:46px;height:46px;border-radius:999px;border:1px solid var(--border-strong);background:transparent;color:var(--muted-strong);
+    font-size:22px;line-height:1;cursor:pointer;transition:all .16s;font-family:inherit;flex:none}
+  .step:hover{color:#fff;border-color:var(--mint)}
+  .step:disabled{opacity:.35;cursor:default;color:var(--muted)}
+  .stepVal{font-family:var(--font-serif);font-style:italic;font-size:34px;color:#fff;min-width:118px;text-align:center;font-variant-numeric:tabular-nums}
+  .saveBtn{width:100%;border:none;border-radius:999px;padding:13px;font-size:14.5px;font-weight:600;font-family:inherit;
+    background:linear-gradient(180deg,#8df0c9,var(--mint));color:#04140d;cursor:pointer;transition:filter .18s,transform .12s var(--ease-soft)}
+  .saveBtn:hover{filter:brightness(1.05)}
+  .saveBtn:disabled{opacity:.5;cursor:default;filter:none}
+  .saveMsg{font-family:var(--font-mono);font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;text-align:center;min-height:14px;color:var(--muted)}
+  /* Shown once, when the import actually brought days across. Say what
+     happened and how much, so a chart that suddenly has history is explained
+     rather than a surprise. Never shown when nothing crossed. */
+  .migrated{font-size:12.5px;line-height:1.6;color:var(--muted-strong);text-align:center;padding:0 6px}
+  .migrated[hidden]{display:none}
+  .saveMsg.ok{color:var(--mint)}
+  .saveMsg.bad{color:var(--amber)}
+
+  /* the chart */
+  .chartHead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--border);border-radius:999px;background:var(--card)}
+  .segBtn{border:none;background:transparent;color:var(--muted);font-family:var(--font-mono);font-size:0.58rem;letter-spacing:0.12em;
+    text-transform:uppercase;padding:6px 11px;border-radius:999px;cursor:pointer;transition:background .18s,color .18s;white-space:nowrap}
+  .segBtn[aria-current="true"]{background:rgba(110,231,183,0.16);color:var(--mint)}
+  .stage{position:relative;width:100%}
+  .stage svg{display:block;width:100%;height:auto;overflow:visible}
+  .barRise{transform-box:fill-box;transform-origin:bottom;animation:barRise 460ms var(--ease-premium) both}
+  @keyframes barRise{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+  .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;
+    font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted)}
+  .cap{font-family:var(--font-mono);font-size:0.56rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);
+    display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  .key{display:inline-flex;align-items:center;gap:7px}
+  .keyBar{width:9px;height:12px;border-radius:2px;background:linear-gradient(180deg,var(--mint),rgba(110,231,183,0.3))}
+  .keyZero{width:9px;height:2px;background:var(--mint);border-radius:1px}
+  .keyNone{width:9px;height:9px;border:1px solid var(--border-strong);border-radius:1px}
+  .keyRef{width:16px;border-top:1px dashed var(--mint);opacity:.8}
+  .stats{display:flex;gap:10px;flex-wrap:wrap}
+  .stat{flex:1 1 120px;min-width:0;border:1px solid var(--border);border-radius:12px;background:var(--card-elev);padding:11px 13px}
+  .statL{font-family:var(--font-mono);font-size:0.54rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted)}
+  .statV{font-family:var(--font-serif);font-size:1.4rem;line-height:1.1;margin-top:5px;color:var(--fg);font-variant-numeric:tabular-nums}
+  .statV em{font-style:normal;font-size:0.7rem;color:var(--muted-strong);margin-left:3px}
+  .statV.dim{color:var(--muted)}
+  .foot{font-family:var(--font-mono);font-size:0.54rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);text-align:center;margin-top:22px}
+  .note{font-size:12.5px;line-height:1.6;color:var(--muted-strong)}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none !important;opacity:1 !important;transform:none !important}
+  }
+
+  /* the other half of the pair: the night before, as a fact.
+     A number and its date, and nothing derived from putting them together. */
+  .pair{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .pairV{font-family:var(--font-serif);font-style:italic;font-size:2rem;line-height:1;color:#fff;font-variant-numeric:tabular-nums}
+  .pairV.none{color:var(--muted);font-size:1.15rem}
+  .pairN{font-family:var(--font-mono);font-size:0.56rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="atmo" id="atmo" aria-hidden="true"><div class="atmoGlow"></div></div>
+<div class="wrap">
+  <div class="hero">
+    <div class="heroTitle">Today on <em>screen</em></div>
+    <div class="heroDate" id="heroDate">&nbsp;</div>
+  </div>
+
+  <!-- log -->
+  <section class="card">
+    <div class="eyebrow">Log a day</div>
+    <div class="lastNight">
+      <div class="lnVal" id="lnVal">&mdash;</div>
+      <div class="lnLab" id="lnLab">the day being logged</div>
+    </div>
+    <div class="stepRow">
+      <button type="button" class="step" id="minus" aria-label="Half an hour less">&minus;</button>
+      <span class="stepVal" id="stepVal">6h 0m</span>
+      <button type="button" class="step" id="plus" aria-label="Half an hour more">+</button>
+    </div>
+    <button type="button" class="saveBtn" id="save">Save today</button>
+    <div class="saveMsg" id="saveMsg"></div>
+    <div class="migrated" id="migrated" hidden></div>
+  </section>
+
+  <!-- the chart -->
+  <section class="card">
+    <div class="chartHead">
+      <div class="eyebrow">Hours a day &middot; newest bar is today</div>
+      <div class="seg" id="seg"></div>
+    </div>
+    <div class="stage" id="stage"></div>
+    <div class="cap">
+      <span class="key"><i class="keyBar"></i> logged</span>
+      <span class="key"><i class="keyZero"></i> logged 0h</span>
+      <span class="key"><i class="keyNone"></i> no entry</span>
+      <span class="key"><i class="keyRef"></i> 8h reference</span>
+    </div>
+  </section>
+
+  <!-- the pair, side by side. Two numbers, both dated, no verdict. -->
+  <section class="card">
+    <div class="eyebrow">The night before</div>
+    <div class="pair">
+      <span class="pairV" id="pairV">&mdash;</span>
+      <span class="pairN" id="pairN">reading the Sleep tile</span>
+    </div>
+  </section>
+
+  <!-- the readouts -->
+  <section class="card">
+    <div class="eyebrow">This window &middot; days only</div>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <p class="foot">each bar is one day &middot; the sleep line is logged in the Sleep tile &middot; 16h is the ceiling on the stepper</p>
+</div>
+<script>
+/* ═══ PURE:BEGIN — no DOM, no bridge, no Date.now(). Everything below is a
+   pure function of its arguments so the maths can be checked outside a browser. ═══ */
+/* THE DAY IS THE KEY. A day's hours live under that day, unshifted: a user was
+   awake FOR the day they are logging. This is the one convention that differs
+   from sleep.html, and the difference is the whole reason the two tiles can sit
+   next to each other without lying — a night's hours are stored under the day
+   the night began, so a day's hours are stored under the day the day happened.
+   Same addDays/shiftKey primitives in both files so the two can never drift. */
+var HOURS_MIN=0, HOURS_MAX=16, STEP=0.5, TARGET_HOURS=8;
+var WINDOWS=[14,30,0];              // 0 = every day on record
+var WINDOW_LABELS=['14 days','30 days','all'];
+var DAY_NAMES=['Su','Mo','Tu','We','Th','Fr','Sa'];
+var MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var DAY_LONG=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+var MONTH_LONG=['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+/** Local YYYY-MM-DD. Local fields on purpose: a UTC key rolls the date. */
+function dateKey(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+/** Parse a YYYY-MM-DD key to a Date at LOCAL midnight. `new Date(key)` would
+    parse it as UTC midnight, which is the previous day west of Greenwich. */
+function parseKey(k){
+  var p=String(k).split('-');
+  return new Date(Number(p[0]),Number(p[1])-1,Number(p[2]));
+}
+function isDateKey(k){ return typeof k==='string' && /^\d{4}-\d{2}-\d{2}$/.test(k); }
+
+/** Calendar-day arithmetic via setDate, never +86400000. A 23h or 25h DST day
+    would make the millisecond version skip or repeat a day. */
+function addDays(d,n){
+  var x=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  x.setDate(x.getDate()+n);
+  return x;
+}
+/** Shift a date KEY by whole calendar days, DST-safe, same rule as addDays. */
+function shiftKey(k,n){
+  return dateKey(addDays(parseKey(k),n));
+}
+/** The day this tile logs: today. `now` is an ARGUMENT so the clock never
+    enters the pure block, and so a test can pin it. Every reader resolves
+    "today" through this. */
+function todayKeyAt(now){ return dateKey(now); }
+
+/** The last `n` DAYS ending at (and including) endKey, oldest first.
+    n<=0 means "every day on record", which is why it also takes `all`. */
+function windowDates(endKey,n,all){
+  all=Array.isArray(all)?all:[];
+  if(!(n>0)) return all.slice();
+  var out=[],d=parseKey(endKey);
+  for(var i=n-1;i>=0;i--) out.push(dateKey(addDays(d,-i)));
+  return out;
+}
+/** Only a real number of hours is a fact about a day.
+    `Number(null)`, `Number(false)`, `Number('')` and `Number([])` are ALL 0, so
+    a coercive cast invents a 0h day out of an absent value — and a fabricated
+    0 then draws a logged bar and drags the window average. So a value must be a
+    finite NUMBER (which is what the stepper writes and what JSON round-trips)
+    and must already sit inside the stepper's own 0–16 range. A genuine 0
+    SURVIVES: a real 0h day is a different fact from not logging one, and the
+    chart draws them differently.
+    Out of range is REJECTED, never clamped: a clamp would write a plausible
+    looking but wrong day into a store with no backup, and the wrong value would
+    then outrank the truth forever. Rejecting costs nothing — the day simply
+    gets no bar.
+    Finer than the stepper's own 0.5h grid is QUANTISED to it (moves a value by
+    at most 0.25h, never turns one day into another), because 0.5h IS this
+    tile's resolution of an hour. */
+function normHours(n){
+  if(typeof n!=='number'||!isFinite(n)) return null;
+  if(n<HOURS_MIN||n>HOURS_MAX) return null;
+  return Math.round(n/STEP)*STEP;
+}
+/** The screen store -> ascending [{key,hours}], skipping anything unusable. */
+function ownDays(store){
+  if(!store||typeof store!=='object') return [];
+  return Object.keys(store)
+    .filter(isDateKey)
+    .map(function(k){ var h=normHours(store[k]&&store[k].hours); return h==null?null:{key:k,hours:h}; })
+    .filter(Boolean)
+    .sort(function(a,b){ return a.key<b.key?-1:a.key>b.key?1:0; });
+}
+/** The night that ended on the morning of `dayKey`, read out of the SLEEP
+    store. Sleep keys a night by the day it BEGAN, so the night before a day is
+    that day's key shifted back one. This is the ONLY thing this tile knows
+    about another tile, and it is a fact, not a comparison: the tile never puts
+    the two numbers next to each other to draw a conclusion.
+    Returns null for an absent night, and null for a read that never arrived —
+    the caller tells those two apart, because "no entry" and "could not read"
+    are different truths and collapsing them is how a read failure becomes a
+    fabricated zero. */
+function nightHoursFor(sleepStore,dayKey){
+  if(!sleepStore||typeof sleepStore!=='object'||Array.isArray(sleepStore)) return null;
+  var rec=sleepStore[shiftKey(dayKey,-1)];
+  if(!rec||typeof rec!=='object') return null;
+  if(typeof rec.hours!=='number'||!isFinite(rec.hours)) return null;
+  return rec.hours;
+}
+/** How many days in a row back from `lastKey` are logged. Walks DAY keys from
+    ONE anchor passed in, never off the clock per iteration, so the streak and
+    the log card above it can never disagree about which day is last.
+    Capped so a corrupt store cannot spin here forever. */
+function dayStreak(by,lastKey){
+  var n=0;
+  for(;n<10000;n++){
+    if(!by || !by[shiftKey(lastKey,-n)]) break;
+  }
+  return n;
+}
+/** Bar geometry. n>=1 always: a one-day window divides by n, never by n-1,
+    so a single bar lands dead centre instead of NaN. */
+function barGeom(innerW,n){
+  n=Math.max(1,n|0);
+  var pitch=innerW/n, gap=pitch*0.3;
+  return {pitch:pitch, gap:gap, w:Math.max(1,pitch-gap), n:n};
+}
+/** Hours -> y pixels, measured down from the top of the plot. Fixed domain. */
+function yForHours(h,geo){ return geo.top+geo.innerH*(1-Math.max(HOURS_MIN,Math.min(HOURS_MAX,h))/HOURS_MAX); }
+function baselineY(geo){ return geo.top+geo.innerH; }
+/** How many x labels fit before they collide, so the axis thins instead of
+    overprinting itself at phone width. */
+function labelStep(pitch){
+  if(pitch>=26) return 1;
+  if(pitch>=14) return 2;
+  return Math.max(2,Math.ceil(26/pitch));
+}
+/** Hours -> "7h 30m". A REAL 0 prints as "0h", because a logged 0 is a fact.
+    The minutes are rounded to a whole minute, and a rounded 60 CARRIES into the
+    hour: 7.999 is 54 seconds short of 8h, but Math.round(0.999*60) is 60, and
+    "7h 60m" is a number that does not exist. The carry is reachable in practice
+    because a window AVERAGE is not on the 0.5h grid the stepper writes — the
+    same fix belongs in sleep.html, which has the identical helper. */
+function fmtHours(h){
+  if(h==null) return '—';
+  var hh=Math.floor(h),mm=Math.round((h-hh)*60);
+  if(mm===60){ hh+=1; mm=0; }
+  return hh+'h'+(mm?' '+mm+'m':'');
+}
+function fmtLong(key){
+  var d=parseKey(key);
+  return DAY_NAMES[d.getDay()]+' '+d.getDate()+' '+MONTHS[d.getMonth()];
+}
+/** The day's date in full. Always say WHICH day is being asked about, in the
+    same words everywhere. */
+function fmtLongDate(key){
+  var d=parseKey(key);
+  return DAY_LONG[d.getDay()]+' '+d.getDate()+' '+MONTH_LONG[d.getMonth()];
+}
+function avgHours(list){
+  if(!list.length) return null;
+  var s=0; for(var i=0;i<list.length;i++) s+=list[i].hours;
+  return s/list.length;
+}
+/** The report payload, built to the shape lib/tiles/reportContract.ts accepts:
+    key, label, a finite value, a YYYY-MM-DD date, a kind from its fixed
+    taxonomy, and an optional direction. `duration` is the honest kind for
+    hours, and the direction is `down` because the number this tile exists to
+    make visible is a cost, not a gain — that is the mentor's stated reason for
+    asking for the tile, stated once in data form, with no copy anywhere in this
+    file that judges the user. */
+function reportStream(day){
+  if(!day||day.hours==null||!isDateKey(day.key)) return null;
+  return {key:'screen_hours',label:'Screen time',value:day.hours,date:day.key,kind:'duration',goalDirection:'down'};
+}
+/* ═══ PURE:END ═══ */
+
+/* ── state ── */
+var BRIDGE = (window.Vitality && typeof window.Vitality.load === 'function') ? window.Vitality : null;
+var store = {};
+var winIdx = 0;
+var draft = STEP*12;                 // 6h, a plain mid-point of the stepper's range
+var saveMsg = null;                  // null | {ok:boolean, text:string}
+/* 'loading' until the read settles, then 'ready' (we have a store) or
+   'unavailable' (the read failed or timed out). 'no_entry' is not a state
+   here: an empty store IS ready, and the render below says "no entry" for the
+   night itself. Keeping the three apart is the whole point — a failed read must
+   never render as a night the user did not sleep. */
+var sleepState = 'loading';
+var sleepStore = null;
+var stage = document.getElementById('stage');
+
+/** The day we are logging, recomputed from the clock on every call and NEVER
+    frozen at load. A tile left open across midnight used to keep writing to
+    yesterday's key while the stats walked off the new one; now the log card,
+    the chart's newest bar, the streak, the sleep pairing and the report all
+    read the same anchor or none of them do. `anchorKey` is only there to notice
+    a rollover. */
+var anchorKey = todayKeyAt(new Date());
+function todayKey(){ return todayKeyAt(new Date()); }
+
+function days(){ return ownDays(store); }
+function byKey(){ var m={}; days().forEach(function(d){ m[d.key]=d; }); return m; }
+function dayFor(k){ return byKey()[k]||null; }
+
+function renderLog(){
+  var lastKey=todayKey();
+  var rec=dayFor(lastKey);
+  var v=document.getElementById('lnVal');
+  if(rec){ v.textContent=fmtHours(rec.hours); v.className='lnVal'; }
+  else { v.textContent='no entry'; v.className='lnVal none'; }
+  // Always the DAY in full, never "today" on its own: the day the user is
+  // logging is named so a tile left open overnight is never ambiguous about
+  // which key the number under it belongs to.
+  document.getElementById('lnLab').textContent='the day of '+fmtLongDate(lastKey);
+  document.getElementById('stepVal').textContent=fmtHours(draft);
+  document.getElementById('minus').disabled = draft <= HOURS_MIN;
+  document.getElementById('plus').disabled  = draft >= HOURS_MAX;
+  var btn=document.getElementById('save');
+  // Disabled only when there is nothing NEW to write: either the day already
+  // holds exactly this value, or (at the ends of the stepper's range) the draft
+  // cannot move. Deliberately NOT `!rec ||` — a day with no entry yet is the
+  // one case where saving is the whole point, and a `!rec` guard leaves the
+  // first day permanently unloggable, which is the exact bug sleep.html still
+  // carries. An absent day renders "no entry"; it is an absence, not a value
+  // the Save button should refuse.
+  btn.disabled = !!(rec && rec.hours===draft);
+  btn.textContent = (rec ? 'Update ' : 'Save ')+fmtLongDate(lastKey);
+  var m=document.getElementById('saveMsg');
+  m.className='saveMsg'+(saveMsg?(saveMsg.ok?' ok':' bad'):'');
+  m.textContent=saveMsg?saveMsg.text:'';
+  // Nothing is migrated out of another tile here, so this line stays hidden.
+  // It is kept because it is the same slot the Sleep tile uses for its import
+  // report, and a tile that grows a second source of data must explain it here
+  // rather than leaving a chart with unexplained history.
+  var mig=document.getElementById('migrated');
+  mig.hidden=true; mig.textContent='';
+}
+
+/* The other half of the pair, and only that: the hours logged for the night
+   that ended this morning, as one dated number. No ratio, no comparison
+   sentence, nothing that says what the two together mean — the tile shows two
+   facts and stops. */
+function renderPair(){
+  var v=document.getElementById('pairV'), n=document.getElementById('pairN');
+  var key=todayKey();
+  if(sleepState==='loading'){ v.textContent='—'; v.className='pairV'; n.textContent='reading the Sleep tile'; return; }
+  if(sleepState==='unavailable'){
+    v.textContent='unavailable'; v.className='pairV none';
+    n.textContent='the Sleep tile did not answer — nothing is assumed about the night';
+    return;
+  }
+  var h=nightHoursFor(sleepStore,key);
+  v.textContent = h==null ? 'no entry' : fmtHours(h);
+  v.className = h==null ? 'pairV none' : 'pairV';
+  n.textContent = h==null
+    ? 'the night of '+fmtLongDate(shiftKey(key,-1))+' is not logged in Sleep'
+    : 'the night of '+fmtLongDate(shiftKey(key,-1))+' · logged in Sleep';
+}
+
+function renderSeg(){
+  var seg=document.getElementById('seg');
+  seg.innerHTML=WINDOWS.map(function(w,i){
+    return '<button type="button" class="segBtn" aria-current="'+(i===winIdx)+'" data-win="'+i+'">'+WINDOW_LABELS[i]+'</button>';
+  }).join('');
+}
+document.getElementById('seg').addEventListener('click',function(e){
+  var b=e.target.closest('[data-win]'); if(!b) return;
+  winIdx=Number(b.getAttribute('data-win'));
+  renderSeg(); renderAll();
+});
+
+/* ── the chart: hand-rolled SVG, string-built, measured not guessed ──
+   Same technique as sleep.html — measure the container, build a viewBox that
+   matches it, concatenate the markup, and NO preserveAspectRatio="none". That
+   attribute stretches a viewBox to fill its box, which would squash the bars'
+   width as the tile resizes; with the viewBox width set to the measured width
+   the aspect already matches, so the default only ever kicks in as a letterbox. */
+function renderChart(){
+  var W=Math.max(260,Math.round(stage.clientWidth||320));
+  var H=168;
+  var PAD={top:14,right:6,bottom:22,left:30};
+  var innerW=W-PAD.left-PAD.right, innerH=H-PAD.top-PAD.bottom;
+  var geo={top:PAD.top,innerH:innerH};
+
+  var all=days();
+  // The window ENDS today, so the newest bar on the chart is the day the log
+  // card above is asking about: "14 days" means today and the 13 before it.
+  var lastKey=todayKey();
+  var keys=windowDates(lastKey,WINDOWS[winIdx],all.map(function(d){return d.key;}));
+  var by=byKey();
+  var inWin=keys.map(function(k){ return by[k]||{key:k,hours:null}; });
+  var logged=inWin.filter(function(d){ return d.hours!=null; });
+  var total=all.length;
+
+  var esc=function(s){ return String(s).replace(/[<>&"]/g,function(c){ return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]; }); };
+  var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'" role="img" aria-label="Hours on screen per day">';
+  s+='<defs><linearGradient id="sc-bar" x1="0" x2="0" y1="0" y2="1">'+
+     '<stop offset="0%" stop-color="'+ '#d4fce8' +'"/><stop offset="100%" stop-color="'+ '#6EE7B7' +' stop-opacity="0.28"/></linearGradient></defs>';
+
+  // gridlines: 4 / 8 / 12. The 8 is the reference and reads as one.
+  [4,8,12].forEach(function(h){
+    var y=yForHours(h,geo);
+    var isRef = h===TARGET_HOURS;
+    s+='<line x1="'+PAD.left+'" x2="'+(W-PAD.right)+'" y1="'+y.toFixed(1)+'" y2="'+y.toFixed(1)+'" '+
+       'stroke="var(--mint)" stroke-opacity="'+(isRef?0.55:0.13)+'" stroke-width="1" '+(isRef?'stroke-dasharray="4 4"':'')+'/>';
+    s+='<text x="'+(PAD.left-6)+'" y="'+(y+3.2).toFixed(1)+'" text-anchor="end" font-size="9" '+
+       'font-family="var(--font-mono)" fill="var(--muted)" opacity="'+(isRef?1:0.75)+'">'+h+'h</text>';
+  });
+  s+='<line x1="'+PAD.left+'" x2="'+(W-PAD.right)+'" y1="'+baselineY(geo).toFixed(1)+'" y2="'+baselineY(geo).toFixed(1)+
+     '" stroke="var(--border-strong)" stroke-width="1"/>';
+
+  // bars
+  var g=barGeom(innerW,inWin.length);
+  var step=labelStep(g.pitch);
+  for(var i=0;i<inWin.length;i++){
+    var n=inWin[i];
+    var x=PAD.left+i*g.pitch+g.gap/2;
+    var title=fmtLongDate(n.key)+' — '+(n.hours==null?'no entry':fmtHours(n.hours)+' on screen');
+    if(n.hours==null){
+      // an ABSENCE. A faint tick at the baseline, never a zero-height bar:
+      // "you didn't log it" and "you were on a screen 0h" are different facts.
+      s+='<rect x="'+x.toFixed(1)+'" y="'+(baselineY(geo)-3).toFixed(1)+'" width="'+g.w.toFixed(1)+
+         '" height="3" rx="1" fill="var(--border-strong)"><title>'+esc(title)+'</title></rect>';
+    }else{
+      var y=yForHours(n.hours,geo);
+      var h=Math.max(2,baselineY(geo)-y);            // 0h still gets a visible 2px stub
+      var isLast=(n.key===lastKey);
+      s+='<rect class="barRise" x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+g.w.toFixed(1)+
+         '" height="'+h.toFixed(1)+'" rx="'+Math.min(2,g.w/2).toFixed(1)+'" fill="url(#sc-bar)" '+
+         'stroke="'+(isLast?'var(--mint)':'none')+'" stroke-width="'+(isLast?1.4:0)+'" '+
+         'style="animation-delay:'+(i*18)+'ms"><title>'+esc(title)+'</title></rect>';
+      if(n.hours===0){
+        s+='<circle cx="'+(x+g.w/2).toFixed(1)+'" cy="'+(baselineY(geo)-6).toFixed(1)+'" r="1.6" fill="var(--mint)"/>';
+      }
+    }
+    // Every x label names the day, so the axis can never be read as a night the
+    // user was asleep. The narrow form keeps the two-letter label from colliding.
+    if(i%step===0 || i===inWin.length-1){
+      s+='<text x="'+(x+g.w/2).toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" font-size="9" '+
+         'font-family="var(--font-mono)" fill="'+(n.key===lastKey?'var(--mint)':'var(--muted)')+'">'+
+         (n.key===lastKey?'today · ':'')+DAY_NAMES[parseKey(n.key).getDay()]+'</text>';
+    }
+  }
+  s+='</svg>';
+  stage.innerHTML=s;
+
+  // Honest degradation: the frame and the reference line stay, and the empty
+  // state sits inside them. No placeholder bars, no invented baseline.
+  var note=document.getElementById('chartNote');
+  if(!note) { note=document.createElement('div'); note.id='chartNote'; stage.appendChild(note); }
+  if(logged.length===0){
+    note.className='empty';
+    note.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;pointer-events:none;padding:0 24px';
+    note.innerHTML='<span>'+(total?'nothing logged in this window':'nothing logged yet')+'</span>'+
+      '<span style="opacity:.7;text-transform:none;letter-spacing:.06em">'+
+      (total?'try a wider window':'log a day above and the bars appear here')+'</span>';
+  } else {
+    note.className=''; note.style.cssText='display:none'; note.innerHTML='';
+  }
+}
+
+/* All three views read ONE anchor, recomputed per call. The streak used to walk
+   off `new Date()` on every iteration while the log card was frozen at load, so
+   a tile left open across midnight counted a streak that started on a day the
+   card had already scrolled past. */
+function renderStats(){
+  var all=days();
+  var lastKey=todayKey();
+  var keys=windowDates(lastKey,WINDOWS[winIdx],all.map(function(d){return d.key;}));
+  var by=byKey();
+  var inWin=keys.map(function(k){ return by[k]||null; }).filter(Boolean);
+  var avg=avgHours(inWin);
+  var last=dayFor(lastKey);
+  var streak=dayStreak(by,lastKey);
+  var overRef=inWin.filter(function(d){ return d.hours>=TARGET_HOURS; }).length;
+  var cell=function(label,val,unit,dim){
+    return '<div class="stat"><div class="statL">'+label+'</div><div class="statV'+(dim?' dim':'')+'">'+
+      val+(unit?'<em>'+unit+'</em>':'')+'</div></div>';
+  };
+  document.getElementById('stats').innerHTML=
+      cell('Today', last?fmtHours(last.hours).split(' ')[0]:'—', last?fmtHours(last.hours).split(' ')[1]||'':'no entry', !last)
+    + cell('Average a day', avg==null?'—':fmtHours(avg).split(' ')[0], avg==null?'':(fmtHours(avg).split(' ')[1]||''), avg==null)
+    + cell('Days logged', String(inWin.length), ' of '+keys.length)
+    + cell('Consecutive days', streak>0?String(streak):'—', streak>0?'to date':'start one', streak===0)
+    + cell('At or over '+TARGET_HOURS+'h', String(overRef), ' in window');
+}
+
+/* ── report → the Mentor. Fire and forget, exactly as the bridge defines it.
+   Nothing consumes this yet (the host's handler is a no-op); it is here so the
+   seam is real and the payload already matches the contract. ── */
+function reportLatest(){
+  if(!BRIDGE || typeof BRIDGE.report!=='function') return;
+  // TODAY, not "the newest key in the store". A day with no entry is an
+  // absence, and the payload's `date` would otherwise claim a reading for a
+  // day the tile itself shows as "no entry".
+  var stream=reportStream(dayFor(todayKey()));
+  if(!stream) return;
+  try { BRIDGE.report(stream); } catch(e) { /* the channel is optional */ }
+}
+
+/* ── save. AWAITED, and the rejection handled.
+   Most other tiles wrap Vitality.save in try/catch WITHOUT awaiting it, which
+   cannot catch a rejected promise: the tile renders "saved" and the write was
+   dropped. Here the promise settles before the confirmation appears. ── */
+function persist(){
+  if(!BRIDGE || typeof BRIDGE.save!=='function'){
+    saveMsg={ok:false,text:'no bridge — nothing was written'};
+    renderLog(); return Promise.resolve(false);
+  }
+  // The key is resolved at SAVE time, not at load: a tile left open across
+  // midnight writes the day that actually just started.
+  var lastKey=todayKey();
+  store[lastKey]={hours:normHours(draft)};
+  return BRIDGE.save(store).then(function(){
+    saveMsg={ok:true,text:'saved'};
+    renderAll(); reportLatest();
+    return true;
+  },function(err){
+    saveMsg={ok:false,text:(err&&err.message==='too_large_or_full')?'storage full — not saved':'could not save'};
+    renderLog();
+    return false;
+  });
+}
+
+document.getElementById('minus').addEventListener('click',function(){
+  draft=Math.max(HOURS_MIN,Math.round((draft-STEP)/STEP)*STEP); renderLog();
+});
+document.getElementById('plus').addEventListener('click',function(){
+  draft=Math.min(HOURS_MAX,Math.round((draft+STEP)/STEP)*STEP); renderLog();
+});
+document.getElementById('save').addEventListener('click',function(){ persist(); });
+
+/* One re-render for all three views, off ONE anchor. Anything that mutates the
+   store or the window goes through here, so the log card, the chart and the
+   stats can never be one render apart from each other. */
+function renderAll(){
+  anchorKey=todayKey();
+  renderLog(); renderPair(); renderChart(); renderStats();
+}
+
+/* Midnight rollover. `todayKey()` is already recomputed on every read, so the
+   tile is never WRONG — but a tab left open would still show yesterday as
+   "today" until the user clicked something. This is the cheap part that keeps
+   the words honest with no interaction. Polling a clock is fine here; it is a
+   dozen localStorage-free string comparisons a minute. */
+setInterval(function(){ if(todayKey()!==anchorKey) renderAll(); },30000);
+document.addEventListener('visibilitychange',function(){
+  if(!document.hidden && todayKey()!==anchorKey) renderAll();
+});
+
+/* ── boot ── */
+function spawnMotes(){
+  var atmo=document.getElementById('atmo');
+  for(var i=0;i<12;i++){
+    var m=document.createElement('div'); m.className='mote';
+    m.style.left=((i*67+13)%100)+'%';
+    m.style.top=(40+((i*29)%55))+'%';
+    m.style.animationDuration=(9+((i*7)%9))+'s';
+    m.style.animationDelay='-'+((i*1.3)%9)+'s';
+    atmo.appendChild(m);
+  }
+}
+
+function boot(){
+  document.getElementById('heroDate').textContent=fmtLongDate(todayKey()).toUpperCase();
+  renderSeg(); spawnMotes();
+  if(!BRIDGE){
+    store={};
+    sleepState='unavailable';
+    renderAll();
+    return;
+  }
+  BRIDGE.load().then(function(d){
+    store=(d&&typeof d==='object'&&!Array.isArray(d))?d:{};
+    after();
+    // The pairing read runs alongside the first render and NEVER gates it. The
+    // chart does not depend on the Sleep tile, so a Sleep read that is slow,
+    // whitelisted-out, or rejected leaves the rest of the tile exactly as it
+    // would be with the Sleep tile deleted. Rejection is a real answer, not a
+    // missing one, so it lands in `unavailable` rather than `no_entry`.
+    if(typeof BRIDGE.read!=='function'){ sleepState='unavailable'; renderPair(); return; }
+    return BRIDGE.read('sleep').then(function(v){
+      sleepStore=(v&&typeof v==='object')?v:null;
+      sleepState='ready';
+      renderPair();
+    },function(){
+      sleepState='unavailable';
+      renderPair();
+    });
+  },function(){
+    // A load that failed is NOT an empty store: it says nothing about what the
+    // user logged, so the tile renders its empty state and the save button is
+    // the only thing that writes. Nothing is inferred from the failure.
+    store={};
+    renderAll();
+  });
+
+  function after(){
+    var rec=dayFor(todayKey());
+    if(rec) draft=rec.hours;
+    renderAll(); reportLatest();
+  }
+}
+
+if(window.ResizeObserver){ new ResizeObserver(function(){ renderChart(); }).observe(stage); }
+else { window.addEventListener('resize', renderChart); }
+boot();
+</script>
+</body>
+</html>

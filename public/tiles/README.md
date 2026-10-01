@@ -18,6 +18,8 @@ shows the "how to build this" panel instead.
 | `fuel`   | Fuel     | `public/tiles/fuel.html`   |
 | `vitals` | Vitals   | `public/tiles/vitals.html` |
 | `sleep`  | Sleep    | `public/tiles/sleep.html`  |
+| `screen` | Screen   | `public/tiles/screen.html` |
+| `water`  | Water    | `public/tiles/water.html`  |
 | `vee`    | Vee      | `public/tiles/vee.html`    |
 | `peak`   | Peak     | `public/tiles/peak.html`   |
 | `finance`| Finance  | `public/tiles/finance.html`|
