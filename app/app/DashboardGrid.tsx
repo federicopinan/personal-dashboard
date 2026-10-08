@@ -930,6 +930,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                 fontSize: 'clamp(22px, 3.2vw, 34px)',
                 color: goal?.accent ?? 'var(--mint, #6EE7B7)',
                 textShadow: `0 0 34px ${goal?.accent ?? '#6EE7B7'}44`,
+                overflowWrap: 'anywhere',
                 animation: 'goalPop .7s cubic-bezier(.22,1,.36,1) both',
               }}
             >
@@ -939,7 +940,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
           </div>
 
           {/* y = the goal picker — every goal visible, one tap to switch */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
             <span style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontSize: 22, color: goal?.accent ?? 'var(--mint, #6EE7B7)', transition: 'color .8s ease' }}>y</span>
             <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--muted, #8a8f98)' }}>=</span>
 
@@ -982,7 +983,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                       alignItems: 'center',
                       cursor: 'pointer',
                       transition: 'color .5s ease, background .5s ease, border-color .5s ease',
-                      whiteSpace: 'nowrap',
+                      overflowWrap: 'anywhere',
                     }}
                   >
                     {main ? '★ ' : ''}
@@ -991,10 +992,10 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                 )
               }
               return (
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', minWidth: 0 }}>
                   {mainG && btn(mainG, false)}
                   {others.length > 0 && (
-                    <div style={{ display: 'flex', gap: 4, border: '1px solid var(--border, #262626)', borderRadius: 999, padding: 4, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 4, border: '1px solid var(--border, #262626)', borderRadius: 999, padding: 4, flexWrap: 'wrap', minWidth: 0 }}>
                       {others.map((g) => btn(g, true))}
                     </div>
                   )}
@@ -1014,8 +1015,8 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
             }}
           />
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <a href="/mentor" style={{ display: 'flex', alignItems: 'baseline', gap: 10, textDecoration: 'none' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minWidth: 0 }}>
+            <a href="/mentor" style={{ display: 'flex', alignItems: 'baseline', gap: 10, textDecoration: 'none', minWidth: 0 }}>
               <span style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontSize: 22, color: goal?.accent ?? 'var(--mint, #6EE7B7)', transition: 'color .8s ease' }}>x</span>
               <span
                 aria-hidden
@@ -1024,7 +1025,8 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                   fontSize: 11,
                   letterSpacing: '.16em',
                   textTransform: 'uppercase',
-                  whiteSpace: 'nowrap',
+                  overflowWrap: 'anywhere',
+                  minWidth: 0,
                   pointerEvents: 'none',
                   color: goal?.accent ?? 'var(--mint, #6EE7B7)',
                   opacity: xPeek ? 0.8 : 0,
@@ -1048,6 +1050,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                 padding: '0 16px',
                 minHeight: 'var(--touch)',
                 display: 'inline-flex',
+                flexShrink: 0,
                 alignItems: 'center',
                 fontWeight: 600,
                 fontSize: 12,
