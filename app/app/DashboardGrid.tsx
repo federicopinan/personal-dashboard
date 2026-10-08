@@ -919,7 +919,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
           <style>{`@keyframes goalPop { from { opacity: 0; transform: translateY(12px) scale(.94) } to { opacity: 1; transform: none } }`}</style>
 
           {/* the picked goal comes out — big, centred, in its own colour */}
-          <div style={{ textAlign: 'center', minHeight: 46 }}>
+          <div className="equationGoal" style={{ textAlign: 'center', minHeight: 46 }}>
             <span
               key={goal?.id ?? 'none'}
               style={{
@@ -940,7 +940,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
           </div>
 
           {/* y = the goal picker — every goal visible, one tap to switch */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+          <div className="equationPicker" style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
             <span style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontSize: 22, color: goal?.accent ?? 'var(--mint, #6EE7B7)', transition: 'color .8s ease' }}>y</span>
             <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--muted, #8a8f98)' }}>=</span>
 
@@ -1004,18 +1004,38 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
             })()}
 
           </div>
+          <details className="mobileGoals">
+            <summary>Switch goal</summary>
+            <div className="mobileGoalsList">
+              {allGoals().map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  aria-current={g.id === goal?.id ? 'true' : undefined}
+                  onClick={(e) => {
+                    setActiveGoalId(g.id)
+                    setGoal(g)
+                    window.dispatchEvent(new CustomEvent('vitality:goal'))
+                    e.currentTarget.closest('details')?.removeAttribute('open')
+                  }}
+                >
+                  {g.id === 'overall' ? '★ ' : ''}{g.title}
+                </button>
+              ))}
+            </div>
+          </details>
           <TileFace
             id="vee"
             isVee
             core={null}
-            fixed={{ width: '100%', height: 'clamp(240px, 34vh, 340px)' }}
+            fixed={{ width: '100%', height: 'var(--mentor-height, clamp(240px, 34vh, 340px))' }}
             kicker={goal?.title}
             onOpen={() => {
               if (!editing) setMentorAlive(true) // the mentor comes to life — no page load
             }}
           />
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minWidth: 0 }}>
+          <div className="equationInputs" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minWidth: 0 }}>
             <a href="/mentor" style={{ display: 'flex', alignItems: 'baseline', gap: 10, textDecoration: 'none', minWidth: 0 }}>
               <span style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontSize: 22, color: goal?.accent ?? 'var(--mint, #6EE7B7)', transition: 'color .8s ease' }}>x</span>
               <span
@@ -1059,6 +1079,9 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
             >
               {editing ? 'Done' : 'Edit'}
             </button>
+          </div>
+          <div className="mobileWeights" aria-label="Input weights for active goal">
+            {gridIds.map((id) => <span key={id}>{labelFor(id)} <strong>{weights[id] ?? 0}%</strong></span>)}
           </div>
 
           <div className="xGrid">
