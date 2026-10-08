@@ -330,10 +330,6 @@
 /* drag affordances — iPhone/iPad home-screen wobble (off-centre origin + a
    staggered, slightly random phase per tile so they don't wobble in lockstep). */
 .veeTiles.editing .tile.editable{cursor:grab;transform-origin:50% 10%;
-  /* edit-mode only: let dnd-kit's PointerSensor own the gesture so a touch-drag
-     lifts the tile instead of the browser claiming it for scroll (pointercancel,
-     tile never moves). Normal (non-editing) scrolling is unaffected. */
-  touch-action:none;
   animation:veeJiggle .62s var(--vease) infinite}
 .veeTiles.editing .tile.editable:nth-child(2n){animation-delay:-.18s;animation-duration:.66s}
 .veeTiles.editing .tile.editable:nth-child(3n){animation-delay:-.31s;animation-duration:.58s}
@@ -350,6 +346,15 @@
   box-shadow:0 0 0 1px var(--mint),0 32px 66px -14px rgba(0,0,0,.82)}
 @keyframes veeJiggle{0%,100%{transform:rotate(-.7deg)}50%{transform:rotate(.7deg)}}
 @media (prefers-reduced-motion:reduce){.veeTiles.editing .tile.editable{animation:none}}
+
+/* Tap-to-reorder controls stay outside the poster's hit layer. The rest of the
+   cell retains native touch scrolling; desktop drag remains on the cell. */
+.veeTiles .xCell{position:relative}
+.veeTiles .reorderControls{position:absolute;top:8px;right:8px;z-index:10;display:flex;gap:4px}
+.veeTiles .reorderControls button{width:var(--touch);height:var(--touch);border-radius:10px;
+  border:1px solid rgba(110,231,183,.45);background:rgba(6,9,8,.94);color:var(--mint);
+  font-size:20px;cursor:pointer}
+.veeTiles .reorderControls button:disabled{opacity:.35;cursor:default}
 
 /* Whop-style corner controls: the size / design / remove actions live in ONE
    cohesive glass pill (not three separate floating buttons) with quiet icon
@@ -439,4 +444,3 @@
   pointer-events: none;
   z-index: 6;
 }
-

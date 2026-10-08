@@ -1062,7 +1062,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
           </div>
 
           <div className="xGrid">
-            {gridIds.map((id) => (
+            {gridIds.map((id, index) => (
               <div
                 key={id}
                 className="xCell"
@@ -1090,6 +1090,12 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                   accent={goal?.accent}
                   onOpen={() => openSlot(id)}
                 />
+                {editing && (
+                  <div className="reorderControls">
+                    <button type="button" disabled={index === 0} aria-label={`Move ${labelFor(id)} earlier`} onClick={() => moveTo(id, gridIds[index - 1])}>↑</button>
+                    <button type="button" disabled={index === gridIds.length - 1} aria-label={`Move ${labelFor(id)} later`} onClick={() => moveTo(gridIds[index + 1], id)}>↓</button>
+                  </div>
+                )}
               </div>
             ))}
 
