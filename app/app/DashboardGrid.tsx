@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import gsap from 'gsap'
 import { VEE_TILE, DEFAULT_HOME_ORDER, coreDefaultSize, coreTileFor, tileLabel, type CoreTile } from '@/lib/tiles/coreTiles'
 import { discoverTiles, humanizeTileId, isTileId, tileFilePath, type RosterProblem, type TileFetcher, type TileRescan, type TileRoster } from '@/lib/tiles/tileRoster'
 import dynamic from 'next/dynamic'
@@ -723,6 +724,19 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
   const dragId = useRef<string | null>(null)
   const filledRef = useRef<FilledMap>({})
 
+  useEffect(() => {
+    if (!ref.current || (!openId && !connectId && !newOpen && !mentorAlive)) return
+    const mm = gsap.matchMedia()
+    mm.add('(prefers-reduced-motion: no-preference)', () => {
+      const overlay = ref.current?.querySelector('.openOverlay, .mentorOverlay')
+      if (!overlay) return
+      gsap.fromTo(overlay, { opacity: 0 }, { opacity: 1, duration: 0.2, ease: 'power2.out' })
+      const card = overlay.querySelector('.openCard')
+      if (card) gsap.fromTo(card, { y: 12 }, { y: 0, duration: 0.32, ease: 'power2.out' })
+    }, ref)
+    return () => mm.revert()
+  }, [openId, connectId, newOpen, mentorAlive])
+
   const { register, unregister } = useTileHost(userId, undefined, () => {})
 
   useEffect(() => {
@@ -919,7 +933,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
           <style>{`@keyframes goalPop { from { opacity: 0; transform: translateY(12px) scale(.94) } to { opacity: 1; transform: none } }`}</style>
 
           {/* the picked goal comes out — big, centred, in its own colour */}
-          <div style={{ textAlign: 'center', minHeight: 46 }}>
+          <div className="equationGoal" style={{ textAlign: 'center', minHeight: 46 }}>
             <span
               key={goal?.id ?? 'none'}
               style={{
@@ -930,7 +944,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                 fontSize: 'clamp(22px, 3.2vw, 34px)',
                 color: goal?.accent ?? 'var(--mint, #6EE7B7)',
                 textShadow: `0 0 34px ${goal?.accent ?? '#6EE7B7'}44`,
-                animation: 'goalPop .7s cubic-bezier(.22,1,.36,1) both',
+                overflowWrap: 'anywhere',
               }}
             >
               {goal?.id === 'overall' ? '★ ' : ''}
@@ -939,7 +953,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
           </div>
 
           {/* y = the goal picker — every goal visible, one tap to switch */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="equationPicker" style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
             <span style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontSize: 22, color: goal?.accent ?? 'var(--mint, #6EE7B7)', transition: 'color .8s ease' }}>y</span>
             <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--muted, #8a8f98)' }}>=</span>
 
@@ -981,8 +995,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                       display: 'inline-flex',
                       alignItems: 'center',
                       cursor: 'pointer',
-                      transition: 'color .5s ease, background .5s ease, border-color .5s ease',
-                      whiteSpace: 'nowrap',
+                      overflowWrap: 'anywhere',
                     }}
                   >
                     {main ? '★ ' : ''}
@@ -991,10 +1004,10 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                 )
               }
               return (
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', minWidth: 0 }}>
                   {mainG && btn(mainG, false)}
                   {others.length > 0 && (
-                    <div style={{ display: 'flex', gap: 4, border: '1px solid var(--border, #262626)', borderRadius: 999, padding: 4, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 4, border: '1px solid var(--border, #262626)', borderRadius: 999, padding: 4, flexWrap: 'wrap', minWidth: 0 }}>
                       {others.map((g) => btn(g, true))}
                     </div>
                   )}
@@ -1003,19 +1016,39 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
             })()}
 
           </div>
+          <details className="mobileGoals">
+            <summary>Switch goal</summary>
+            <div className="mobileGoalsList">
+              {allGoals().map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  aria-current={g.id === goal?.id ? 'true' : undefined}
+                  onClick={(e) => {
+                    setActiveGoalId(g.id)
+                    setGoal(g)
+                    window.dispatchEvent(new CustomEvent('vitality:goal'))
+                    e.currentTarget.closest('details')?.removeAttribute('open')
+                  }}
+                >
+                  {g.id === 'overall' ? '★ ' : ''}{g.title}
+                </button>
+              ))}
+            </div>
+          </details>
           <TileFace
             id="vee"
             isVee
             core={null}
-            fixed={{ width: '100%', height: 'clamp(240px, 34vh, 340px)' }}
+            fixed={{ width: '100%', height: 'var(--mentor-height, clamp(240px, 34vh, 340px))' }}
             kicker={goal?.title}
             onOpen={() => {
               if (!editing) setMentorAlive(true) // the mentor comes to life — no page load
             }}
           />
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <a href="/mentor" style={{ display: 'flex', alignItems: 'baseline', gap: 10, textDecoration: 'none' }}>
+          <div className="equationInputs" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minWidth: 0 }}>
+            <a href="/mentor" style={{ display: 'flex', alignItems: 'baseline', gap: 10, textDecoration: 'none', minWidth: 0 }}>
               <span style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontSize: 22, color: goal?.accent ?? 'var(--mint, #6EE7B7)', transition: 'color .8s ease' }}>x</span>
               <span
                 aria-hidden
@@ -1024,7 +1057,8 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                   fontSize: 11,
                   letterSpacing: '.16em',
                   textTransform: 'uppercase',
-                  whiteSpace: 'nowrap',
+                  overflowWrap: 'anywhere',
+                  minWidth: 0,
                   pointerEvents: 'none',
                   color: goal?.accent ?? 'var(--mint, #6EE7B7)',
                   opacity: xPeek ? 0.8 : 0,
@@ -1048,6 +1082,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                 padding: '0 16px',
                 minHeight: 'var(--touch)',
                 display: 'inline-flex',
+                flexShrink: 0,
                 alignItems: 'center',
                 fontWeight: 600,
                 fontSize: 12,
@@ -1057,9 +1092,12 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
               {editing ? 'Done' : 'Edit'}
             </button>
           </div>
+          <div className="mobileWeights" aria-label="Input weights for active goal">
+            {gridIds.map((id) => <span key={id}>{labelFor(id)} <strong>{weights[id] ?? 0}%</strong></span>)}
+          </div>
 
           <div className="xGrid">
-            {gridIds.map((id) => (
+            {gridIds.map((id, index) => (
               <div
                 key={id}
                 className="xCell"
@@ -1087,6 +1125,12 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
                   accent={goal?.accent}
                   onOpen={() => openSlot(id)}
                 />
+                {editing && (
+                  <div className="reorderControls">
+                    <button type="button" disabled={index === 0} aria-label={`Move ${labelFor(id)} earlier`} onClick={() => moveTo(id, gridIds[index - 1])}>↑</button>
+                    <button type="button" disabled={index === gridIds.length - 1} aria-label={`Move ${labelFor(id)} later`} onClick={() => moveTo(gridIds[index + 1], id)}>↓</button>
+                  </div>
+                )}
               </div>
             ))}
 
@@ -1146,6 +1190,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
       {/* the mentor, alive over the board — everything fades behind it */}
       {mentorAlive && (
         <div
+          className="mentorOverlay"
           style={{
             position: 'fixed',
             inset: 0,

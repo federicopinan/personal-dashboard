@@ -1,13 +1,24 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.js
 .yarn/install-state.gz
+.pnpm-store/
 
-# testing
-/coverage
+# cache
+.cache/
+.turbo/
+.eslintcache
+
+# testing artifacts (reports and coverage only — test code is tracked)
+/coverage/
+coverage/
+/test-results/
+playwright-report/
+blob-report/
+.nyc_output/
 
 # next.js
 /.next/
@@ -82,11 +93,11 @@ scripts/data/
 public/*-preview.html
 /explain-*.png
 /pol-*.png
+# local tool & agent workflows (odd, atl, pi)
+odd/
+.odd/
 .atl/
-
-# playwright test outputs (local run artifacts, never committed)
-/test-results/
-.maint-*.png
-
-# local tool config (pi, atl — never committed)
 .pi/
+
+# local test & UI artifacts
+.maint-*.png

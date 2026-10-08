@@ -52,6 +52,27 @@
 .veeTiles .xCell{aspect-ratio:15/17;align-self:start;container-type:inline-size}
 .veeTiles .xAdd{aspect-ratio:15/17;align-self:start}
 .veeTiles .xCell>.tile{width:100%;height:100%}
+.veeTiles .mobileGoals,.veeTiles .mobileWeights{display:none}
+@media (max-width:480px){
+  .veeTiles{--mentor-height:188px}
+  .veeTiles .equationGoal{min-height:0!important;text-align:left!important;line-height:1.25}
+  .veeTiles .equationGoal::before{content:'y =';display:block;color:var(--vmuted);font:12px var(--mono);margin-bottom:5px}
+  .veeTiles .equationPicker,.veeTiles .tile.vee .kicker{display:none!important}
+  .veeTiles .mobileGoals{display:block;position:relative;align-self:flex-start;max-width:100%}
+  .veeTiles .mobileGoals summary{cursor:pointer;min-height:var(--touch);display:flex;align-items:center;padding:0 14px;
+    border:1px solid var(--vborder);border-radius:999px;color:var(--mint);font-size:13px;list-style:none}
+  .veeTiles .mobileGoals summary::-webkit-details-marker{display:none}
+  .veeTiles .mobileGoals summary::after{content:'⌄';margin-left:10px}
+  .veeTiles .mobileGoalsList{position:absolute;top:100%;left:0;z-index:11;min-width:min(288px,calc(100vw - 32px));
+    max-height:240px;overflow-y:auto;padding:6px;background:#101a16;border:1px solid var(--vborder);border-radius:12px}
+  .veeTiles .mobileGoalsList button{display:block;width:100%;min-height:var(--touch);padding:8px 12px;
+    text-align:left;overflow-wrap:anywhere;background:transparent;border:0;border-radius:8px;color:var(--vfg);font:13px var(--hanken);cursor:pointer}
+  .veeTiles .mobileGoalsList button[aria-current]{background:rgba(110,231,183,.14);color:var(--mint)}
+  .veeTiles .equationInputs a>span:nth-child(2){display:none!important}
+  .veeTiles .mobileWeights{display:flex;flex-wrap:wrap;gap:8px;color:var(--vmuted);font:12px var(--mono)}
+  .veeTiles .mobileWeights span{min-width:0;overflow-wrap:anywhere;padding:7px 9px;border:1px solid var(--vborder);border-radius:8px}
+  .veeTiles .mobileWeights strong{color:var(--vfg);font-weight:600}
+}
 /* the + tile: the same cell, transparent — build the next input. It is a grid
    child, not a .xCell, so it has no query container of its own; its radius is a
    plain 20px for that reason. */
@@ -330,10 +351,6 @@
 /* drag affordances — iPhone/iPad home-screen wobble (off-centre origin + a
    staggered, slightly random phase per tile so they don't wobble in lockstep). */
 .veeTiles.editing .tile.editable{cursor:grab;transform-origin:50% 10%;
-  /* edit-mode only: let dnd-kit's PointerSensor own the gesture so a touch-drag
-     lifts the tile instead of the browser claiming it for scroll (pointercancel,
-     tile never moves). Normal (non-editing) scrolling is unaffected. */
-  touch-action:none;
   animation:veeJiggle .62s var(--vease) infinite}
 .veeTiles.editing .tile.editable:nth-child(2n){animation-delay:-.18s;animation-duration:.66s}
 .veeTiles.editing .tile.editable:nth-child(3n){animation-delay:-.31s;animation-duration:.58s}
@@ -350,6 +367,15 @@
   box-shadow:0 0 0 1px var(--mint),0 32px 66px -14px rgba(0,0,0,.82)}
 @keyframes veeJiggle{0%,100%{transform:rotate(-.7deg)}50%{transform:rotate(.7deg)}}
 @media (prefers-reduced-motion:reduce){.veeTiles.editing .tile.editable{animation:none}}
+
+/* Tap-to-reorder controls stay outside the poster's hit layer. The rest of the
+   cell retains native touch scrolling; desktop drag remains on the cell. */
+.veeTiles .xCell{position:relative}
+.veeTiles .reorderControls{position:absolute;top:8px;right:8px;z-index:10;display:flex;gap:4px}
+.veeTiles .reorderControls button{width:var(--touch);height:var(--touch);border-radius:10px;
+  border:1px solid rgba(110,231,183,.45);background:rgba(6,9,8,.94);color:var(--mint);
+  font-size:20px;cursor:pointer}
+.veeTiles .reorderControls button:disabled{opacity:.35;cursor:default}
 
 /* Whop-style corner controls: the size / design / remove actions live in ONE
    cohesive glass pill (not three separate floating buttons) with quiet icon
@@ -389,11 +415,10 @@
    pure black, a slim top bar with a Dashboard back link, the sealed iframe fills
    the rest. The centred card look remains for the connector (build-this) dialog. */
 .veeTiles .openOverlay{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:24px;
-  background:rgba(0,0,0,.72);backdrop-filter:blur(6px);animation:openFade .22s var(--vease) both}
+  background:rgba(0,0,0,.72);backdrop-filter:blur(6px)}
 .veeTiles .openCard{width:min(640px,100%);height:min(86vh,820px);display:flex;flex-direction:column;
   background:#000;border:1px solid rgba(167,243,208,.16);border-radius:22px;overflow:hidden;
-  box-shadow:0 36px 90px -28px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.05);
-  animation:openRise .3s var(--vease) both}
+  box-shadow:0 36px 90px -28px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.05)}
 .veeTiles .openTop{display:flex;align-items:center;justify-content:space-between;gap:12px;
   padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.07);flex:none}
 .veeTiles .openTitle{font-family:var(--serif);font-style:italic;font-size:20px;letter-spacing:.3px;
@@ -405,13 +430,10 @@
 .veeTiles .openClose svg{width:17px;height:17px}
 .veeTiles .openStage{flex:1;min-height:0;position:relative;overflow:hidden;background:#000}
 .veeTiles .openFrame{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent}
-@keyframes openFade{from{opacity:0}to{opacity:1}}
-@keyframes openRise{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
 
 /* Filled tile = full page. No scrim, no card chrome: the tile IS the page. */
 .veeTiles .openOverlay.openFull{padding:0;place-items:stretch;background:#000;backdrop-filter:none}
-.veeTiles .openOverlay.openFull .openCard{width:100%;height:100%;border:0;border-radius:0;box-shadow:none;
-  animation:openPage .32s var(--vease) both}
+.veeTiles .openOverlay.openFull .openCard{width:100%;height:100%;border:0;border-radius:0;box-shadow:none}
 .veeTiles .openOverlay.openFull .openTop{padding:max(14px,env(safe-area-inset-top)) 20px 12px;
   border-bottom:1px solid rgba(255,255,255,.06)}
 /* The way out of a filled tile, and the only way out on a phone. The top bar is
@@ -423,7 +445,25 @@
 .veeTiles .openBack:hover{color:var(--mint)}
 .veeTiles .openSlotName{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
   color:rgba(255,255,255,.38);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@keyframes openPage{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: no-preference) {
+  .veeTiles .equationGoal > span { animation: goalPop .7s cubic-bezier(.22,1,.36,1) both; }
+}
+
+/* Give the board's actual controls feedback without transforming the live tiles. */
+.veeTiles :is(.equationPicker, .mobileGoals, .equationInputs, .reorderControls) button,
+.veeTiles :is(.openBack, .openClose, .xAdd) {
+  transition: color .18s var(--vease), background .18s var(--vease), border-color .18s var(--vease), transform .12s var(--vease);
+}
+.veeTiles :is(.equationPicker, .mobileGoals, .equationInputs, .reorderControls) button:active:not(:disabled),
+.veeTiles :is(.openBack, .openClose, .xAdd):active:not(:disabled) { transform: scale(.97); }
+.veeTiles :is(.equationPicker, .mobileGoals, .equationInputs, .reorderControls) button:focus-visible,
+.veeTiles :is(.openBack, .openClose, .xAdd):focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .veeTiles :is(.equationPicker, .mobileGoals, .equationInputs, .reorderControls) button,
+  .veeTiles :is(.openBack, .openClose, .xAdd) { transition: none; }
+  .veeTiles :is(.equationPicker, .mobileGoals, .equationInputs, .reorderControls) button:active:not(:disabled),
+  .veeTiles :is(.openBack, .openClose, .xAdd):active:not(:disabled) { transform: none; }
+}
 
 /* No-routine state: a gentle prompt replaces the score number on the Vee tile. */
 .veeTiles .tile.vee .vee-setup-prompt {
@@ -439,4 +479,3 @@
   pointer-events: none;
   z-index: 6;
 }
-
