@@ -52,11 +52,18 @@
   min-height: var(--touch);
   padding: 12px 4px;
   margin: -12px -4px;
-  transition: color var(--duration) var(--ease);
+  transition: color var(--duration) var(--ease), transform var(--duration-fast) var(--ease);
 }
 
 .back:hover {
   color: var(--fg);
+}
+
+.back:active { transform: translateX(-2px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .back { transition: none; }
+  .back:active { transform: none; }
 }
 
 .back:focus-visible {

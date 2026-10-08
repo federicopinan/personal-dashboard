@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
+import gsap from 'gsap'
 import Link from 'next/link'
 import WelcomeBackdrop from './WelcomeBackdrop'
 import styles from './PageShell.module.css'
@@ -22,6 +24,14 @@ export default function PageShell({
   kicker: string
   children: React.ReactNode
 }) {
+  const shell = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const mm = gsap.matchMedia()
+    mm.add('(prefers-reduced-motion: no-preference)', () => {
+      gsap.fromTo(shell.current, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.42, ease: 'power2.out' })
+    }, shell)
+    return () => mm.revert()
+  }, [])
   return (
     <main className={`${styles.page} grain-overlay`}>
       <WelcomeBackdrop />
@@ -36,7 +46,7 @@ export default function PageShell({
         }}
       />
 
-      <div className={styles.shell}>
+      <div className={styles.shell} ref={shell}>
         <Link href="/" className={styles.back}>← Dashboard</Link>
         <h1 className={styles.title}>{title}</h1>
         <p className={styles.kicker}>{kicker}</p>
