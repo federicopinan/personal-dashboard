@@ -1,0 +1,171 @@
+/* The chrome that lives next to the date: a ticking clock + editable
+   location on one row, a manual weather block on the next. Same vocabulary
+   as the rest of the dashboard — Instrument Serif italic for the numbers,
+   Inter for the clickable text, JetBrains Mono (via ui-monospace) for the
+   micro-labels, mint on dark. */
+
+.status {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 4px;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  min-width: 0;
+}
+
+.label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted, rgba(255, 255, 255, 0.5));
+  margin-right: 4px;
+  align-self: center;
+  flex-shrink: 0;
+}
+
+/* The clock face — same Instrument Serif italic as the greeting, just smaller.
+   tabular-nums so the seconds don't shimmy as the digits change. */
+.clock {
+  font-family: var(--font-serif, Georgia, 'Times New Roman', serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(1.55rem, 3.2vw, 2.15rem);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--fg, #fff);
+  font-variant-numeric: tabular-nums;
+}
+
+.temp {
+  font-family: var(--font-serif, Georgia, 'Times New Roman', serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(1.35rem, 2.6vw, 1.85rem);
+  line-height: 1;
+  color: var(--fg, #fff);
+  font-variant-numeric: tabular-nums;
+}
+
+.placeholder {
+  font-family: var(--font-serif, Georgia, 'Times New Roman', serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(1.35rem, 2.6vw, 1.85rem);
+  line-height: 1;
+  color: var(--muted, rgba(255, 255, 255, 0.4));
+  font-variant-numeric: tabular-nums;
+}
+
+.secondary {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--muted, rgba(255, 255, 255, 0.5));
+}
+
+/* The separator between time/weather and the location — a single dot, no comma
+   — keeps the line from looking like a list when it wraps on a narrow phone. */
+.dot {
+  color: var(--muted, rgba(255, 255, 255, 0.35));
+  flex-shrink: 0;
+}
+
+/* Click-to-edit cells. They look like text until hover, at which point they
+   pick up a faint underline + cursor so it reads as interactive. Disabled
+   button styling keeps them out of the tab order without stripping the
+   accessible name — they still take focus and fire on Enter. */
+.cell {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 1px 4px;
+  margin: 0;
+  font: inherit;
+  font-size: 0.92rem;
+  color: var(--fg, #fff);
+  cursor: text;
+  border-radius: 6px;
+  text-align: left;
+  border-bottom: 1px dashed transparent;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background 160ms ease;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.cell:hover {
+  border-bottom-color: rgba(110, 231, 183, 0.55);
+  background: rgba(110, 231, 183, 0.04);
+}
+.cell:focus-visible {
+  outline: 2px solid var(--mint, #6EE7B7);
+  outline-offset: 2px;
+  border-bottom-color: transparent;
+}
+.cellEmpty {
+  color: var(--muted, rgba(255, 255, 255, 0.45));
+  font-style: italic;
+}
+
+.input {
+  appearance: none;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--mint, #6EE7B7);
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin: 0;
+  font: inherit;
+  font-size: 0.92rem;
+  color: var(--fg, #fff);
+  outline: none;
+  min-width: 120px;
+  max-width: 100%;
+}
+.input:focus {
+  box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.18);
+}
+
+/* The condition cell inherits the body font (no italic), unlike the location. */
+.cond {
+  font-size: 0.95rem;
+}
+
+/* The location cells deserve italic — they sit alongside a serif number, and
+   italic matches the time block's "Buenos Aires" affordance. */
+.loc {
+  font-style: italic;
+}
+
+/* Humidity + wind chips appear only when at least one has a value. Small,
+   mono caps label + value + unit, faint border, no chrome. */
+.chips {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.chip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-strong, rgba(255, 255, 255, 0.7));
+  padding: 2px 8px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.14));
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* On the narrow screen, the row still wraps cleanly because the cells already
+   use overflow-wrap: anywhere; nothing new to add here — the parent .header
+   already flexes correctly at 760px. */

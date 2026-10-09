@@ -425,7 +425,7 @@ export default function Dashboard({ firstName, userId }: DashboardProps) {
       <div className={styles.shell}>
         <div className={styles.headerRow}>
           <DashboardHeaderGem className={styles.headerGem} />
-          <DashboardHeader firstName={firstName} greeting={chrome?.greeting} date={chrome?.date} />
+          <DashboardHeader firstName={firstName} greeting={chrome?.greeting} date={chrome?.date} userId={userId} />
           <div
             className={styles.profileAvatar}
             onClick={() => setSettingsOpen(true)}
