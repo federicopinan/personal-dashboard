@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#050505" />
+<title>Time</title>
+<!--
+  TIME — local clock + greeting + editable location. The greeting and the clock
+  are derived live from `new Date()` and never persisted; only `location` is.
+  Sealed: no network, no fonts over the wire. Saves through window.Vitality.
+  Store: { location: string }
+
+  HOUR → PHRASE
+    05–11 Good morning
+    12–17 Good afternoon
+    18–21 Good evening
+    22–04 Late night
+  Each boundary is INCLUDED on the lower end and EXCLUDED on the upper; the
+  next range picks up. Self-checks at the human turns: 04→Late night,
+  11→Good morning, 17→Good afternoon, 21→Good evening, 22→Late night.
+
+  The greeting is recomputed on every tick and the DOM is only mutated when
+  the phrase actually changes, so a tab left open flips cleanly at the hour
+  boundary on the second the clock shows :00:00.
+
+  FALLBACK: a shim that uses localStorage["v:prev:time"] is installed ONLY
+  when window.Vitality is not already defined, so opening the file directly
+  on disk (`file://`) still renders. The host bridge always wins.
+-->
+<style>
+  :root{
+    --bg:#050505;--fg:#ededf0;--brand:#6EE7B7;
+    --muted:#84848c;--muted-strong:#a8a8b0;--border:#1d1d22;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --serif:'Instrument Serif',Georgia,'Times New Roman',serif;
+    --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --ease:cubic-bezier(.16,1,.3,1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--font);display:flex;justify-content:center;padding:40px 20px;-webkit-font-smoothing:antialiased;position:relative;overflow-x:hidden}
+  body::before{content:'';position:fixed;inset:0;z-index:-2;pointer-events:none;background:
+    radial-gradient(58% 44% at 50% -6%, rgba(110,231,183,.12), transparent 62%),
+    radial-gradient(1.5px 1.5px at 14% 16%, rgba(255,255,255,.5), transparent 100%),
+    radial-gradient(1px 1px at 76% 10%, rgba(255,255,255,.4), transparent 100%),
+    radial-gradient(1.5px 1.5px at 52% 6%, rgba(255,255,255,.32), transparent 100%),
+    radial-gradient(1px 1px at 30% 28%, rgba(255,255,255,.28), transparent 100%)}
+  .shell{width:100%;max-width:520px;text-align:center}
+
+  .eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:18px}
+
+  .greet{font-family:var(--serif);font-style:italic;font-size:clamp(30px,5.2vw,44px);line-height:1.06;color:#fff;letter-spacing:-.01em;font-weight:400}
+
+  .clock{margin-top:22px;font-family:var(--serif);font-style:italic;font-size:clamp(72px,17vw,124px);line-height:1;color:#fff;
+    font-variant-numeric:tabular-nums;text-shadow:0 0 44px rgba(110,231,183,.22);letter-spacing:-.02em}
+
+  .secs{margin-top:12px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--muted-strong);text-transform:uppercase;font-variant-numeric:tabular-nums}
+
+  /* location */
+  .loc{margin:36px auto 0;display:inline-flex;flex-direction:column;align-items:center;gap:8px;padding:14px 24px;
+    border:1px solid var(--border);border-radius:14px;background:rgba(14,14,17,.5);min-width:240px}
+  .locLabel{font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+  .locVal{font-family:var(--serif);font-style:italic;font-size:22px;line-height:1;color:#fff;cursor:pointer;padding:3px 8px;border-radius:6px;transition:background .15s,color .15s}
+  .locVal:hover{background:rgba(110,231,183,.09);color:var(--brand)}
+  .locVal.empty{color:var(--muted);font-family:var(--mono);font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;font-style:normal}
+  .locIn{font-family:var(--serif);font-style:italic;font-size:22px;line-height:1;color:#fff;background:rgba(0,0,0,.45);border:1px solid var(--brand);
+    border-radius:6px;padding:3px 10px;outline:none;text-align:center;width:200px;max-width:240px}
+  .locIn::placeholder{color:var(--muted);font-style:italic;opacity:.7}
+
+  .foot{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-top:30px}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="eyebrow">Time</div>
+  <h1 class="greet" id="greet">Good morning</h1>
+  <div class="clock" id="clock">00:00</div>
+  <div class="secs" id="secs">:00 &middot; UTC</div>
+  <div class="loc">
+    <div class="locLabel">Location</div>
+    <div class="locVal empty" id="locVal" data-edit>Tap to set</div>
+  </div>
+  <div class="foot">your local clock &middot; location is what you say it is</div>
+</div>
+<script>
+let store={};
+let tz='';
+let editing=false;
+let lastGreet='';
+
+function persist(){return window.Vitality.save(store)}
+
+function greetingFor(h){
+  if(h>=5  && h<=11) return 'Good morning';
+  if(h>=12 && h<=17) return 'Good afternoon';
+  if(h>=18 && h<=21) return 'Good evening';
+  return 'Late night';
+}
+
+/* one tick handler does the clock, the seconds line, and the greeting — and
+   the greeting DOM only mutates when the phrase actually changes. That is
+   what makes a tab left open flip cleanly at the hour boundary on the second
+   the clock shows :00:00, with no extra interval to keep in sync. */
+function tick(){
+  const d=new Date();
+  document.getElementById('clock').textContent=
+    String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  document.getElementById('secs').textContent=
+    ':'+String(d.getSeconds()).padStart(2,'0')+' \u00B7 '+tz;
+  const g=greetingFor(d.getHours());
+  if(g!==lastGreet){document.getElementById('greet').textContent=g;lastGreet=g;}
+}
+
+function renderLoc(){
+  if(editing)return;
+  const v=document.getElementById('locVal');
+  if(!v)return;
+  const loc=(store&&typeof store.location==='string')?store.location.trim():'';
+  if(!loc){v.className='locVal empty';v.textContent='Tap to set';}
+  else{v.className='locVal';v.textContent=loc;}
+}
+
+/* click-to-edit: the value span swaps to an input, commits on blur or Enter,
+   reverts on Escape. The whole transform is local to the .loc box so the rest
+   of the tile never reflows. */
+function startEdit(){
+  if(editing)return;
+  const v=document.getElementById('locVal');if(!v)return;
+  const cur=(store&&typeof store.location==='string')?store.location:'';
+  const inp=document.createElement('input');
+  inp.className='locIn';inp.type='text';inp.maxLength=60;inp.placeholder='City or place';
+  inp.setAttribute('autocomplete','off');inp.setAttribute('spellcheck','false');
+  inp.value=cur;
+  v.replaceWith(inp);editing=true;
+  inp.focus();try{inp.select();}catch(e){}
+  const finish=(commit)=>{
+    if(!editing)return;
+    const val=(inp.value||'').trim();
+    store={location:val};
+    persist();
+    editing=false;
+    const span=document.createElement('div');
+    span.id='locVal';span.setAttribute('data-edit','');
+    inp.replaceWith(span);
+    renderLoc();
+  };
+  inp.addEventListener('blur',()=>finish(true));
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault();inp.blur();}
+    else if(e.key==='Escape'){e.preventDefault();inp.value=cur;inp.blur();}
+  });
+}
+
+document.addEventListener('click',e=>{
+  if(e.target.closest('[data-edit]')&&!editing)startEdit();
+});
+
+/* standalone preview (no host bridge): back save/load with localStorage so the
+   file still renders when opened directly. NEVER overwrite a host bridge —
+   the dashboard injects window.Vitality before this script runs there, so
+   this branch only fires on file:// or in tests. */
+if(!window.Vitality){
+  window.Vitality={
+    save:function(d){try{localStorage.setItem('v:prev:time',JSON.stringify(d));}catch(e){}return Promise.resolve(true);},
+    load:function(){try{return Promise.resolve(JSON.parse(localStorage.getItem('v:prev:time')||'{}'));}catch(e){return Promise.resolve({});}}
+  };
+}
+
+(async()=>{
+  try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(e){tz='';}
+  const d=await window.Vitality.load();
+  store=(d&&typeof d==='object'&&!Array.isArray(d))?d:{};
+  if(typeof store.location!=='string')store.location='';
+  renderLoc();
+  tick();
+  setInterval(tick,1000);
+})();
+</script>
+</body>
+</html>
