@@ -15,3 +15,12 @@
 # ESLint config, so `next build` skips linting entirely.
 allowBuilds:
   unrs-resolver: true
+# WSL 2 + Node 24 + Next.js 14 + the pnpm isolated layout together break
+# module resolution on the UNC paths that the 9p filesystem reports. Hoisting
+# (npm-style flat node_modules, no internal symlinks) sidesteps that class of
+# failure. Add an explanation rather than a one-line flag if the project
+# ever moves off WSL or upgrades Node/Next, because this is NOT a portable
+# default — it is a workaround for one specific environment. macOS and
+# native Linux already work fine with isolated linker; only this WSL setup
+# needs hoisted.
+nodeLinker: hoisted

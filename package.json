@@ -10,7 +10,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "bash ./scripts/fix-wsl-next-bin.sh"
   },
   "dependencies": {
     "gsap": "^3.15.0",
