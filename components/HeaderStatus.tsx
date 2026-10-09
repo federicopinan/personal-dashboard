@@ -1,63 +1,111 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { timeStatus, weatherStatus, type TimeStatus, type WeatherStatus } from '@/lib/tiles/headerStatus'
 import styles from './HeaderStatus.module.css'
 
 interface HeaderStatusProps {
-  userId: string
+  /** Reserved for future per-user overrides; today the block has none. */
+  userId?: string
 }
 
-/**
- * The chrome that sits next to the date — a tickable clock, an editable
- * location, and a manual weather row. Same offline philosophy as the rest of
- * the dashboard: no API, no GPS; every value is something the user typed.
+interface WeatherSnapshot {
+  /** Temperature in °C, integer. wttr.in reports Celsius when `format=j1`. */
+  temp: number | null
+  /** Short condition string, e.g. "Clear", "Light rain". wttr.in returns this
+   *  exact form on its `current_condition[0].weatherDesc[0].value` field. */
+  condition: string
+  /** City + country as wttr.in resolved them, joined for the chrome line. */
+  location: string
+  /** Relative humidity in %. wttr.in is the source of truth; null when absent. */
+  humidity: number | null
+  /** Wind speed in km/h. Same source as humidity. */
+  wind: number | null
+  /** Epoch ms the snapshot was fetched. Drives the 10-minute refresh. */
+  fetchedAt: number
+}
+
+/** Browser-driven chrome that lives under the date. Both rows read straight
+ *  from the browser (the OS clock + a public weather endpoint) — no editable
+ *  fields, no localStorage persistence, nothing the user has to set up.
  *
- * Each editable cell is click-to-edit and edits blur-or-Enter to save. Escape
- * cancels and rolls back. Empty cells show a placeholder so the user knows the
- * field exists on first run, and the same cell turns the placeholder into the
- * typed value the moment it commits.
+ *  The Time row shows the local HH:MM and the IANA timezone the browser
+ *  reports; both tick / re-derive on mount. The Weather row fetches
+ *  wttr.in/?format=j1 on mount, holds the response in component state, and
+ *  re-fetches every 10 minutes. A stale or missing response shows muted
+ *  em-dashes — never a fake number — until the next successful fetch lands.
  */
-export default function HeaderStatus({ userId }: HeaderStatusProps) {
-  // Mount-guarded reads: localStorage is server-undefined, so the first render
-  // must produce SOMETHING consistent between SSR and CSR — a stable empty
-  // shape here, then useEffect populates the real values on the client.
-  const [time, setTime] = useState<TimeStatus>({ location: '' })
-  const [weather, setWeather] = useState<WeatherStatus>({
-    location: '',
-    temp: null,
-    condition: '',
-    humidity: null,
-    wind: null,
-  })
-  const [hydrated, setHydrated] = useState(false)
-
-  useEffect(() => {
-    setTime(timeStatus.get(userId))
-    setWeather(weatherStatus.get(userId))
-    setHydrated(true)
-  }, [userId])
-
-  // The clock. Each tick re-fires the same render — cheap, and keeps the time
-  // honest across hour boundaries (the same clock that drives the header
-  // greeting phrase derives its tick from here).
+export default function HeaderStatus(_: HeaderStatusProps) {
   const [now, setNow] = useState<Date | null>(null)
+  const [weather, setWeather] = useState<WeatherSnapshot | null>(null)
+  const [weatherState, setWeatherState] = useState<'loading' | 'live' | 'error'>('loading')
+
+  // The clock. Ticked once per second. setNow(null) on mount keeps the SSR
+  // and the first client paint identical; the effect runs after mount and
+  // the next tick produces the real value.
   useEffect(() => {
     setNow(new Date())
     const id = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(id)
   }, [])
 
-  const saveTimeLoc = (next: string) => {
-    const patched = { location: next }
-    setTime((prev) => ({ ...prev, ...patched }))
-    timeStatus.save(userId, patched)
-  }
+  // Weather. Auto-located via wttr.in by IP at fetch time. Cached for ten
+  // minutes — a refresh more often than that hammers a free public endpoint
+  // without telling us anything new.
+  useEffect(() => {
+    let alive = true
+    let timer: ReturnType<typeof setTimeout> | null = null
 
-  const saveWeather = (patch: Partial<WeatherStatus>) => {
-    setWeather((prev) => ({ ...prev, ...patch }))
-    weatherStatus.save(userId, patch)
-  }
+    const fetchOnce = async () => {
+      try {
+        const res = await fetch('https://wttr.in/?format=j1', {
+          headers: { Accept: 'application/json' },
+        })
+        if (!res.ok) throw new Error('not ok')
+        const j = await res.json()
+        if (!alive) return
+        const cur = Array.isArray(j?.current_condition) ? j.current_condition[0] : null
+        const area = Array.isArray(j?.nearest_area) ? j.nearest_area[0] : null
+        const tempRaw = cur?.temp_C
+        const temp = typeof tempRaw === 'string' || typeof tempRaw === 'number'
+          ? Math.round(Number(tempRaw))
+          : null
+        const condition = (cur?.weatherDesc?.[0]?.value ?? '').toString().trim()
+        const areaName = (area?.areaName?.[0]?.value ?? '').toString().trim()
+        const country = (area?.country?.[0]?.value ?? '').toString().trim()
+        const humidityRaw = cur?.humidity
+        const humidity = typeof humidityRaw === 'string' || typeof humidityRaw === 'number'
+          ? Math.round(Number(humidityRaw))
+          : null
+        const windRaw = cur?.windspeedKmph
+        const wind = typeof windRaw === 'string' || typeof windRaw === 'number'
+          ? Math.round(Number(windRaw))
+          : null
+        const location = [areaName, country].filter(Boolean).join(', ')
+        setWeather({
+          temp: Number.isFinite(temp) ? (temp as number) : null,
+          condition,
+          location,
+          humidity: Number.isFinite(humidity) ? (humidity as number) : null,
+          wind: Number.isFinite(wind) ? (wind as number) : null,
+          fetchedAt: Date.now(),
+        })
+        setWeatherState('live')
+      } catch {
+        if (!alive) return
+        setWeatherState('error')
+      } finally {
+        // Schedule the next refresh only after this one settled, so a
+        // hung network never stacks timers.
+        if (alive) timer = setTimeout(fetchOnce, 10 * 60 * 1000)
+      }
+    }
+
+    fetchOnce()
+    return () => {
+      alive = false
+      if (timer) clearTimeout(timer)
+    }
+  }, [])
 
   return (
     <div className={styles.status} aria-label="Time and weather">
@@ -66,122 +114,45 @@ export default function HeaderStatus({ userId }: HeaderStatusProps) {
         <span className={styles.clock}>
           {now ? formatClock(now) : <span className={styles.placeholder}>--:--</span>}
         </span>
-        <span className={styles.secondary}>
-          {now ? formatZone(now) : ''}
-        </span>
-        <span className={styles.dot} aria-hidden>·</span>
-        <EditCell
-          value={time.location}
-          placeholder="set location"
-          ariaLabel="Time location"
-          className={styles.loc}
-          onCommit={saveTimeLoc}
-        />
+        <span className={styles.secondary}>{now ? formatZone(now) : ''}</span>
       </div>
       <div className={styles.row}>
         <span className={styles.label}>Weather</span>
-        {hydrated && weather.temp != null ? (
-          <span className={styles.temp}>{Math.round(weather.temp)}°</span>
+        {weatherState === 'loading' || !weather ? (
+          <>
+            <span className={styles.placeholder}>—°</span>
+            <span className={styles.placeholder}>—</span>
+          </>
         ) : (
-          <span className={styles.placeholder}>—°</span>
-        )}
-        <EditCell
-          value={weather.condition}
-          placeholder="condition"
-          ariaLabel="Weather condition"
-          className={styles.cond}
-          onCommit={(v) => saveWeather({ condition: v })}
-        />
-        {hydrated && (weather.humidity != null || weather.wind != null) && (
-          <span className={styles.chips}>
-            {weather.humidity != null && (
-              <span className={styles.chip}>{Math.round(weather.humidity)}%</span>
+          <>
+            {weather.temp != null ? (
+              <span className={styles.temp}>{weather.temp}°</span>
+            ) : (
+              <span className={styles.placeholder}>—°</span>
             )}
-            {weather.wind != null && (
-              <span className={styles.chip}>{Math.round(weather.wind)} km/h</span>
+            {weather.condition ? (
+              <span className={styles.conditionText}>{weather.condition}</span>
+            ) : null}
+            {weather.location ? (
+              <span className={styles.locationText}>{weather.location}</span>
+            ) : null}
+            {(weather.humidity != null || weather.wind != null) && (
+              <span className={styles.chips}>
+                {weather.humidity != null && (
+                  <span className={styles.chip}>{weather.humidity}%</span>
+                )}
+                {weather.wind != null && (
+                  <span className={styles.chip}>{weather.wind} km/h</span>
+                )}
+              </span>
             )}
-          </span>
+          </>
         )}
-        {hydrated &&
-          weather.temp == null &&
-          !weather.condition &&
-          (weather.humidity == null && weather.wind == null) && (
-            <span className={styles.secondary}>tap to set temp + condition</span>
-          )}
-        <span className={styles.dot} aria-hidden>·</span>
-        <EditCell
-          value={weather.location}
-          placeholder="set city"
-          ariaLabel="Weather location"
-          className={styles.loc}
-          onCommit={(v) => saveWeather({ location: v })}
-        />
+        {weatherState === 'error' && (
+          <span className={styles.secondary}>couldn&rsquo;t load weather</span>
+        )}
       </div>
     </div>
-  )
-}
-
-/* Small click-to-edit, enter/blur-to-save, escape-to-cancel cell. Single-line
-   text, no validation. Kept inline in this file because it's only used here;
-   a separate component would be premature without a second caller. */
-interface EditCellProps {
-  value: string
-  placeholder: string
-  ariaLabel: string
-  className?: string
-  onCommit: (next: string) => void
-}
-function EditCell({ value, placeholder, ariaLabel, className, onCommit }: EditCellProps) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(value)
-
-  // Resync the draft when the persisted value changes under us (no local edit
-  // in flight). Skipped during an active edit so a save that triggers re-render
-  // never yanks the input back to the old value mid-typing.
-  useEffect(() => {
-    if (!editing) setDraft(value)
-  }, [value, editing])
-
-  if (editing) {
-    return (
-      <input
-        autoFocus
-        type="text"
-        inputMode="text"
-        aria-label={ariaLabel}
-        className={`${styles.input} ${className ?? ''}`}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => {
-          const next = draft.trim()
-          if (next !== value) onCommit(next)
-          setEditing(false)
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            (e.target as HTMLInputElement).blur()
-          } else if (e.key === 'Escape') {
-            setDraft(value)
-            setEditing(false)
-          }
-        }}
-      />
-    )
-  }
-
-  const empty = !value.trim()
-  return (
-    <button
-      type="button"
-      aria-label={ariaLabel}
-      className={`${styles.cell} ${className ?? ''} ${empty ? styles.cellEmpty : ''}`}
-      onClick={() => {
-        setDraft(value)
-        setEditing(true)
-      }}
-    >
-      {empty ? placeholder : value}
-    </button>
   )
 }
 

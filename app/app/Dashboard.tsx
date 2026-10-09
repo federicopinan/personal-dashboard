@@ -354,15 +354,20 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
 
 // The board's way in to /notes and /tasks. Each card says what is actually in
 // this browser right now — how many notes are saved, how many tasks are still
-// open on today's local date. Both numbers are read once on mount and are
-// display-only: nothing here writes, and a key that cannot be read leaves the
-// line empty rather than claiming a zero.
+// open on today's local date, how many bookmarks are saved. The three numbers
+// are read once on mount and are display-only: nothing here writes, and a
+// key that cannot be read leaves the line empty rather than claiming a zero.
 function RouteLinks() {
-  const [counts, setCounts] = useState<{ notes: number | null; open: number | null }>({ notes: null, open: null })
+  const [counts, setCounts] = useState<{ notes: number | null; open: number | null; bookmarks: number | null }>({
+    notes: null,
+    open: null,
+    bookmarks: null,
+  })
 
   useEffect(() => {
     let notes: number | null = null
     let open: number | null = null
+    let bookmarks: number | null = null
     try {
       const saved = JSON.parse(localStorage.getItem('vitality:notes') || '[]')
       if (Array.isArray(saved)) notes = saved.length
@@ -371,7 +376,11 @@ function RouteLinks() {
       const today = JSON.parse(localStorage.getItem(`vitality:tasks:${localDateKey(new Date())}`) || '[]')
       if (Array.isArray(today)) open = today.filter((t: { done?: boolean }) => !t.done).length
     } catch { /* same */ }
-    setCounts({ notes, open })
+    try {
+      const savedBms = JSON.parse(localStorage.getItem('vitality:bookmarks') || '[]')
+      if (Array.isArray(savedBms)) bookmarks = savedBms.length
+    } catch { /* same */ }
+    setCounts({ notes, open, bookmarks })
   }, [])
 
   return (
@@ -380,6 +389,11 @@ function RouteLinks() {
         <Link href="/notes" className={styles.navCard}>
           <span className={styles.navKicker}>Notes</span>
           <span className={styles.navCount}>{counts.notes === null ? '' : `${counts.notes} saved`}</span>
+          <span aria-hidden className={styles.navArrow}>→</span>
+        </Link>
+        <Link href="/bookmarks" className={styles.navCard}>
+          <span className={styles.navKicker}>Bookmarks</span>
+          <span className={styles.navCount}>{counts.bookmarks === null ? '' : `${counts.bookmarks} saved`}</span>
           <span aria-hidden className={styles.navArrow}>→</span>
         </Link>
         <Link href="/tasks" className={styles.navCard}>

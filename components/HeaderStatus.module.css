@@ -1,8 +1,7 @@
-/* The chrome that lives next to the date: a ticking clock + editable
-   location on one row, a manual weather block on the next. Same vocabulary
-   as the rest of the dashboard — Instrument Serif italic for the numbers,
-   Inter for the clickable text, JetBrains Mono (via ui-monospace) for the
-   micro-labels, mint on dark. */
+/* The chrome that lives next to the date: a ticking clock + auto timezone
+   (one row), and an auto-located weather block (next row). No editable cells
+   any more — the user said it has to come from the browser, so everything
+   here is read-only display. */
 
 .status {
   display: flex;
@@ -16,7 +15,7 @@
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 10px 12px;
+  gap: 8px 12px;
   min-width: 0;
 }
 
@@ -32,8 +31,8 @@
   flex-shrink: 0;
 }
 
-/* The clock face — same Instrument Serif italic as the greeting, just smaller.
-   tabular-nums so the seconds don't shimmy as the digits change. */
+/* The clock face — same Instrument Serif italic as the greeting, just
+   smaller. tabular-nums so the seconds don't shimmy as the digits change. */
 .clock {
   font-family: var(--font-serif, Georgia, 'Times New Roman', serif);
   font-style: italic;
@@ -43,6 +42,13 @@
   letter-spacing: -0.01em;
   color: var(--fg, #fff);
   font-variant-numeric: tabular-nums;
+}
+
+.secondary {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--muted, rgba(255, 255, 255, 0.5));
 }
 
 .temp {
@@ -55,6 +61,8 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Muted em-dashes shown while the weather endpoint is loading (or when
+   the snapshot has no temp/condition yet). Anything beats a fake number. */
 .placeholder {
   font-family: var(--font-serif, Georgia, 'Times New Roman', serif);
   font-style: italic;
@@ -65,90 +73,25 @@
   font-variant-numeric: tabular-nums;
 }
 
-.secondary {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  color: var(--muted, rgba(255, 255, 255, 0.5));
-}
-
-/* The separator between time/weather and the location — a single dot, no comma
-   — keeps the line from looking like a list when it wraps on a narrow phone. */
-.dot {
-  color: var(--muted, rgba(255, 255, 255, 0.35));
-  flex-shrink: 0;
-}
-
-/* Click-to-edit cells. They look like text until hover, at which point they
-   pick up a faint underline + cursor so it reads as interactive. Disabled
-   button styling keeps them out of the tab order without stripping the
-   accessible name — they still take focus and fire on Enter. */
-.cell {
-  appearance: none;
-  background: transparent;
-  border: none;
-  padding: 1px 4px;
-  margin: 0;
-  font: inherit;
-  font-size: 0.92rem;
+.conditionText {
+  font-size: 0.95rem;
   color: var(--fg, #fff);
-  cursor: text;
-  border-radius: 6px;
-  text-align: left;
-  border-bottom: 1px dashed transparent;
-  transition:
-    border-color 160ms ease,
-    color 160ms ease,
-    background 160ms ease;
-  min-width: 0;
-  max-width: 100%;
+  /* "Light rain shower" can wrap to two lines on a phone; that's the
+     preferred ugly over truncating it. */
   overflow-wrap: anywhere;
 }
-.cell:hover {
-  border-bottom-color: rgba(110, 231, 183, 0.55);
-  background: rgba(110, 231, 183, 0.04);
-}
-.cell:focus-visible {
-  outline: 2px solid var(--mint, #6EE7B7);
-  outline-offset: 2px;
-  border-bottom-color: transparent;
-}
-.cellEmpty {
-  color: var(--muted, rgba(255, 255, 255, 0.45));
+
+.locationText {
+  font-family: var(--font-serif, Georgia, 'Times New Roman', serif);
   font-style: italic;
-}
-
-.input {
-  appearance: none;
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid var(--mint, #6EE7B7);
-  border-radius: 6px;
-  padding: 2px 6px;
-  margin: 0;
-  font: inherit;
-  font-size: 0.92rem;
-  color: var(--fg, #fff);
-  outline: none;
-  min-width: 120px;
-  max-width: 100%;
-}
-.input:focus {
-  box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.18);
-}
-
-/* The condition cell inherits the body font (no italic), unlike the location. */
-.cond {
   font-size: 0.95rem;
+  color: var(--fg, #fff);
+  overflow-wrap: anywhere;
 }
 
-/* The location cells deserve italic — they sit alongside a serif number, and
-   italic matches the time block's "Buenos Aires" affordance. */
-.loc {
-  font-style: italic;
-}
-
-/* Humidity + wind chips appear only when at least one has a value. Small,
-   mono caps label + value + unit, faint border, no chrome. */
+/* Humidity + wind chips: small mono caps label + value, faint border.
+   Hidden entirely when the snapshot has neither (the layout collapses to
+   just "22° Clear"). */
 .chips {
   display: inline-flex;
   align-items: baseline;
@@ -165,7 +108,3 @@
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.02);
 }
-
-/* On the narrow screen, the row still wraps cleanly because the cells already
-   use overflow-wrap: anywhere; nothing new to add here — the parent .header
-   already flexes correctly at 760px. */

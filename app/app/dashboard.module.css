@@ -595,11 +595,12 @@
    inline equivalent, and the 2px mint ring is the same one every other
    focusable surface in the app uses. */
 .navRow {
-  display: flex;
-  /* Two cards, always side by side. There is no third card and no reason for
-     this row to ever wrap, so the wrap that used to be here — which stacked
-     them one per row on a phone — is gone rather than tuned. */
-  flex-wrap: nowrap;
+  display: grid;
+  /* Three route cards (Notes / Bookmarks / Tasks) share one row. On a phone
+     the single-column shape beats two-cards-then-one; on a desktop the
+     three-up is the intended layout. minmax lets each card shrink below
+     its content so the row never overflows. */
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--space-3);
 }
 
