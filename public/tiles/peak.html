@@ -384,6 +384,12 @@ const SUBSTANCES={
   energy_drink:{key:'energy_drink',name:'Energy drink',glyph:'bolt',tint:'amber',defaultDose:160,unit:'mg',amplitude:20,onsetHours:0.3,peakHours:1.0,halfLifeHours:5.0},
   matcha:{key:'matcha',name:'Matcha',glyph:'leaf',tint:'mint',defaultDose:70,unit:'mg',amplitude:12,onsetHours:0.4,peakHours:1.5,halfLifeHours:6.0},
   green_tea:{key:'green_tea',name:'Green tea',glyph:'leaf',tint:'mint',defaultDose:40,unit:'mg',amplitude:9,onsetHours:0.4,peakHours:1.3,halfLifeHours:6.0},
+  // Mate / yerba mate: a South American infusion carrying caffeine +
+  // theobromine. Default dose is a typical ~40 mg caffeine per gourde. The
+  // amplitude, onset and half-life mirror green_tea because that is what the
+  // same alkaloid profile delivers in practice, and Peak's caffeine maths
+  // only models the caffeine side.
+  mate:{key:'mate',name:'Mate',glyph:'gourd',tint:'mint',defaultDose:40,unit:'mg',amplitude:9,onsetHours:0.4,peakHours:1.3,halfLifeHours:6.0},
   pre_workout:{key:'pre_workout',name:'Pre-workout',glyph:'bolt',tint:'amber',defaultDose:200,unit:'mg',amplitude:22,onsetHours:0.3,peakHours:1.0,halfLifeHours:5.0},
   cold_brew:{key:'cold_brew',name:'Cold brew',glyph:'coffee',tint:'mint',defaultDose:200,unit:'mg',amplitude:21,onsetHours:0.3,peakHours:1.0,halfLifeHours:5.0},
 };
@@ -445,6 +451,9 @@ function glyph(name){
   if(name==='coffee')return `<svg viewBox="0 0 24 24" ${s}><path d="M4 8h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Z"/><path d="M17 9h2.5a2.5 2.5 0 0 1 0 5H17"/><path d="M8 3.5c-.5.6-.5 1.4 0 2M12 3.5c-.5.6-.5 1.4 0 2"/></svg>`;
   if(name==='bolt')return `<svg viewBox="0 0 24 24" ${s}><path d="M13 2 4 14h7l-1 8 10-12h-7l1-8Z"/></svg>`;
   if(name==='leaf')return `<svg viewBox="0 0 24 24" ${s}><path d="M20 4C9 4 4 9 4 18c9 0 15-3 16-14Z"/><path d="M4 20c3-6 7-9 12-11"/></svg>`;
+  // Yerba mate: a small round gourde (mate) with a slim bombilla sticking out
+  // at an angle. Both shapes are simple line paths.
+  if(name==='gourd')return `<svg viewBox="0 0 24 24" ${s}><path d="M8 14a5 5 0 1 1 10 0c0 3-2.5 5-5 5s-5-2-5-5Z"/><path d="M15.5 14.5l3-7"/></svg>`;
   return `<svg viewBox="0 0 24 24" ${s}><circle cx="12" cy="12" r="8"/></svg>`;
 }
 
@@ -454,7 +463,7 @@ function glyph(name){
    whoop via save_data, feel drags write back through the bridge. */
 const DEMO={ weightKg:75, whoop:{}, logs:[], events:[], taps:[] };
 let D=JSON.parse(JSON.stringify(DEMO));
-let quickKeys=['coffee','espresso','energy_drink','matcha'];
+let quickKeys=['coffee','espresso','mate','matcha'];
 const BRIDGE=(typeof window!=='undefined'&&window.Vitality&&typeof window.Vitality.load==='function')?window.Vitality:null;
 
 /* The vitals tile's EXACT recovery formula, copied verbatim so this hardwired

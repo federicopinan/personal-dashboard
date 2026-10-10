@@ -73,13 +73,19 @@
   .veeTiles .mobileWeights span{min-width:0;overflow-wrap:anywhere;padding:7px 9px;border:1px solid var(--vborder);border-radius:8px}
   .veeTiles .mobileWeights strong{color:var(--vfg);font-weight:600}
 }
-/* the + tile: the same cell, transparent — build the next input. It is a grid
-   child, not a .xCell, so it has no query container of its own; its radius is a
-   plain 20px for that reason. */
+/* the + tile: the same cell, transparent — the AI builds the next input.
+   It is a grid child, not a .xCell, so it has no query container of its own;
+   its radius is a plain 20px for that reason. The text inside (kicker + hint)
+   replaces the old giant + glyph: the affordance IS a button now, and it
+   says what it does. */
 .veeTiles .xAdd{border:1px dashed rgba(110,231,183,.35);background:transparent;
-  border-radius:20px;color:var(--mint);font-family:inherit;font-size:46px;font-weight:300;
-  cursor:pointer;transition:border-color .2s var(--vease),background .2s var(--vease)}
+  border-radius:20px;color:var(--mint);font-family:inherit;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  padding:18px 14px;text-align:center;line-height:1.15;
+  transition:border-color .2s var(--vease),background .2s var(--vease)}
 .veeTiles .xAdd:hover{border-color:var(--mint);background:rgba(110,231,183,.04)}
+.veeTiles .xAddKicker{font-size:17px;font-weight:500;letter-spacing:-.005em}
+.veeTiles .xAddHint{font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--mint);opacity:.7}
 
 /* Narrow: three columns hold while a cell stays wide enough to draw its own
    label in. Above 760 the shell is the binding constraint (a 3-up cell is

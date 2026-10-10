@@ -596,12 +596,16 @@
    focusable surface in the app uses. */
 .navRow {
   display: grid;
-  /* Three route cards (Notes / Bookmarks / Tasks) share one row. On a phone
-     the single-column shape beats two-cards-then-one; on a desktop the
-     three-up is the intended layout. minmax lets each card shrink below
-     its content so the row never overflows. */
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  /* Three route cards (Notes / Bookmarks / Tasks) share one row on web.
+     `auto-fit` with minmax collapses to fewer columns below the phone stop
+     (760px), which is the right shape for a phone but wrong on web: this
+     row is meant to read as a three-up. Force three columns; only stack
+     at the existing 760px phone stop. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-3);
+}
+@media (max-width: 760px) {
+  .navRow { grid-template-columns: 1fr; }
 }
 
 .navCard {

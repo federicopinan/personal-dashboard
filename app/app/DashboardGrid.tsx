@@ -391,19 +391,27 @@ function RosterNotice({ problems }: { problems: RosterProblem[] }) {
    re-scan so a file that landed a second ago shows up without a page reload. */
 function NewTileOverlay({ onClose, onRescan }: { onClose: () => void; onRescan: () => Promise<TileRescan> }) {
   const [id, setId] = useState('')
-  const [copied, setCopied] = useState(false)
+  const [copiedCmd, setCopiedCmd] = useState(false)
+  const [copiedPrompt, setCopiedPrompt] = useState(false)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<TileRescan | null>(null)
   const tid = id.trim().toLowerCase()
   const valid = tid === '' || isTileId(tid)
-  const shown = tid || '<id>'
+  const shown = tid || 'coffee'
 
+  // Two artefacts the user might want to copy:
+  //  1) `/tile <id>` — the actual slash command the CLI understands; the
+  //     primary affordance. The overlay LEADS with this.
+  //  2) The build prompt — a paste-into-any-AI fallback for anyone whose
+  //     harness doesn't ship the slash command. Kept as a secondary
+  //     affordance behind a copy button.
+  const command = `/tile ${shown}`
   const prompt = `Build a "${shown}" tile for my Vitality dashboard as ONE self-contained HTML file (all CSS and JS inline, no external requests). Dark background, mint #6EE7B7. Save and load with await window.Vitality.save(data) and await window.Vitality.load() (the dashboard provides window.Vitality, do not use localStorage). Write it to ${tileFilePath(shown)}, add "${shown}" to the "tiles" array in public/tiles/manifest.json, and follow the sealed tile contract in .claude/commands/tile.md.`
 
-  const copy = () => {
-    navigator.clipboard?.writeText(prompt).then(() => {
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
+  const copyText = (text: string, setFlag: (v: boolean) => void) => {
+    navigator.clipboard?.writeText(text).then(() => {
+      setFlag(true)
+      window.setTimeout(() => setFlag(false), 1600)
     })
   }
 
@@ -422,14 +430,14 @@ function NewTileOverlay({ onClose, onRescan }: { onClose: () => void; onRescan: 
       className="openOverlay"
       role="dialog"
       aria-modal="true"
-      aria-label="New tile"
+      aria-label="Talk to AI to build a new tile"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="openCard" style={{ maxWidth: 560, height: 'auto' }}>
+      <div className="openCard" style={{ maxWidth: 580, height: 'auto' }}>
         <div className="openTop">
-          <span className="openTitle">New tile</span>
+          <span className="openTitle">Talk to AI to build this</span>
           <button type="button" className="openClose" aria-label="Close" onClick={onClose}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <line x1="6" y1="6" x2="18" y2="18" />
@@ -439,35 +447,13 @@ function NewTileOverlay({ onClose, onRescan }: { onClose: () => void; onRescan: 
         </div>
         <div className="openStage" style={{ display: 'block', overflow: 'auto', padding: '24px 26px 26px' }}>
           <p style={{ margin: 0, color: 'var(--fg)', fontSize: 19, fontFamily: 'var(--font-serif), Georgia, serif', fontStyle: 'italic' }}>
-            Your assistant builds it. This board has no in-app builder.
+            Run this command in your AI CLI.
           </p>
           <p style={{ margin: '10px 0 0', color: 'var(--muted)', fontSize: 13.5, lineHeight: 1.65 }}>
-            Open this repo in Claude Code, OpenCode, or any AI harness and ask for a tile. It writes
-            the file, the file appears here, and the tile's data stays in this browser.
+            The slash command is exactly what the repo's <code style={{ color: 'var(--mint)' }}>.claude/commands/tile.md</code> teaches your assistant: it writes the sealed HTML file, adds the id to the manifest, and tells you when to come back here to re-scan. Your AI does the work; the dashboard only renders.
           </p>
 
-          <ol style={{ margin: '16px 0 0', color: 'var(--muted)', fontSize: 13.5, lineHeight: 1.7, paddingLeft: 18 }}>
-            <li>
-              Give it a name. Lowercase, no spaces: <code style={{ color: 'var(--mint)' }}>coffee</code>,{' '}
-              <code style={{ color: 'var(--mint)' }}>reading</code>, <code style={{ color: 'var(--mint)' }}>guitar</code>.
-            </li>
-            <li style={{ marginTop: 6 }}>
-              It writes <code style={{ color: 'var(--mint)' }}>{tileFilePath(shown)}</code> and adds that id
-              to <code style={{ color: 'var(--mint)' }}>public/tiles/manifest.json</code>. Both, or the
-              board cannot see the tile.
-            </li>
-            <li style={{ marginTop: 6 }}>
-              Come back and press <strong style={{ color: 'var(--fg)' }}>Re-scan tiles</strong>.
-            </li>
-          </ol>
-
-          <p style={{ margin: '14px 0 0', color: 'var(--muted)', fontSize: 12.5, lineHeight: 1.6 }}>
-            A tile is one sealed HTML file: no network, no localStorage, all CSS and JS inline. The exact
-            rules are in <code style={{ color: 'var(--mint)' }}>.claude/commands/tile.md</code> — read that
-            before writing one.
-          </p>
-
-          <label style={{ display: 'block', marginTop: 18, color: 'var(--muted)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase' }}>
+          <label style={{ display: 'block', marginTop: 22, color: 'var(--muted)', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase' }}>
             Tile name
             <input
               value={id}
@@ -495,38 +481,92 @@ function NewTileOverlay({ onClose, onRescan }: { onClose: () => void; onRescan: 
             </p>
           )}
 
-          <pre
+          <div
+            data-testid="tile-command"
             style={{
-              margin: '12px 0 0',
-              background: 'var(--bg-elevated, #0b0f0d)',
-              border: '1px solid var(--border)',
+              margin: '16px 0 0',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '14px 16px',
+              border: '1px solid var(--mint)',
               borderRadius: 12,
-              padding: '12px 14px',
-              whiteSpace: 'pre-wrap',
-              color: 'var(--fg)',
-              fontSize: 12.5,
-              lineHeight: 1.55,
+              background: 'rgba(110, 231, 183, 0.05)',
             }}
           >
-            {prompt}
-          </pre>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 16 }}>
+            <code
+              style={{
+                flex: 1,
+                minWidth: 0,
+                fontFamily: 'ui-monospace, Menlo, monospace',
+                fontSize: 15,
+                color: 'var(--mint)',
+                letterSpacing: '-0.01em',
+                overflowWrap: 'anywhere',
+              }}
+            >
+              {command}
+            </code>
             <button
               type="button"
-              onClick={copy}
+              onClick={() => copyText(command, setCopiedCmd)}
               style={{
-                padding: '0.65rem 1.2rem',
+                flex: '0 0 auto',
+                padding: '0.55rem 1rem',
                 borderRadius: 999,
                 background: 'var(--mint)',
                 color: 'var(--mint-ink, #042a1c)',
                 fontWeight: 600,
                 border: 'none',
                 cursor: 'pointer',
+                fontSize: 13,
+                whiteSpace: 'nowrap',
               }}
             >
-              {copied ? 'Copied ✓' : 'Copy build prompt'}
+              {copiedCmd ? 'Copied ✓' : 'Copy command'}
             </button>
+          </div>
+
+          <p style={{ margin: '14px 0 0', color: 'var(--muted)', fontSize: 12.5, lineHeight: 1.6 }}>
+            Don&rsquo;t have the <code style={{ color: 'var(--mint)' }}>/tile</code> command wired up? Paste this build prompt into any AI chat and ask it to drop the file here:
+          </p>
+
+          <pre
+            style={{
+              margin: '8px 0 0',
+              background: 'var(--bg-elevated, #0b0f0d)',
+              border: '1px solid var(--border)',
+              borderRadius: 12,
+              padding: '12px 14px',
+              whiteSpace: 'pre-wrap',
+              color: 'var(--muted)',
+              fontSize: 12,
+              lineHeight: 1.55,
+              maxHeight: 140,
+              overflow: 'auto',
+            }}
+          >
+            {prompt}
+          </pre>
+          <button
+            type="button"
+            onClick={() => copyText(prompt, setCopiedPrompt)}
+            style={{
+              marginTop: 8,
+              padding: '0.45rem 0.95rem',
+              borderRadius: 999,
+              background: 'transparent',
+              color: 'var(--mint)',
+              border: '1px solid var(--border)',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontSize: 12.5,
+            }}
+          >
+            {copiedPrompt ? 'Copied ✓' : 'Copy build prompt'}
+          </button>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 22 }}>
             <button
               type="button"
               onClick={rescan}
@@ -534,10 +574,10 @@ function NewTileOverlay({ onClose, onRescan }: { onClose: () => void; onRescan: 
               style={{
                 padding: '0.65rem 1.2rem',
                 borderRadius: 999,
-                background: 'transparent',
-                color: 'var(--mint)',
-                border: '1px solid var(--border)',
+                background: 'var(--mint)',
+                color: 'var(--mint-ink, #042a1c)',
                 fontWeight: 600,
+                border: 'none',
                 cursor: busy ? 'progress' : 'pointer',
                 opacity: busy ? 0.6 : 1,
               }}
@@ -560,6 +600,9 @@ function NewTileOverlay({ onClose, onRescan }: { onClose: () => void; onRescan: 
               Close
             </button>
           </div>
+          <p style={{ margin: '14px 0 0', color: 'var(--muted)', fontSize: 12, lineHeight: 1.55 }}>
+            When the file lands at <code style={{ color: 'var(--mint)' }}>{tileFilePath(tid)}</code> and the manifest has the id, <strong style={{ color: 'var(--fg)' }}>re-scan</strong> brings it onto the board.
+          </p>
 
           {result && (
             <div role="status" style={{ marginTop: 14, color: 'var(--muted)', fontSize: 12.5, lineHeight: 1.65 }}>
@@ -1134,9 +1177,13 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
               </div>
             ))}
 
-            {/* the + tile: the same cell, transparent — build the next input */}
-            <button type="button" className="xAdd" onClick={() => setNewOpen(true)} aria-label="New tile">
-              +
+            {/* the + tile: the same cell, transparent — the AI builds the
+                next input. The label inside the cell reads what the affordance
+                IS, not what it draws; the actual command surfaces inside the
+                overlay, not here. */}
+            <button type="button" className="xAdd" onClick={() => setNewOpen(true)} aria-label="Talk to AI to build this">
+              <span className="xAddKicker">Talk to AI</span>
+              <span className="xAddHint">to build this</span>
             </button>
           </div>
         </div>
