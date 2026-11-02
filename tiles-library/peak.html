@@ -384,6 +384,12 @@ const SUBSTANCES={
   energy_drink:{key:'energy_drink',name:'Energy drink',glyph:'bolt',tint:'amber',defaultDose:160,unit:'mg',amplitude:20,onsetHours:0.3,peakHours:1.0,halfLifeHours:5.0},
   matcha:{key:'matcha',name:'Matcha',glyph:'leaf',tint:'mint',defaultDose:70,unit:'mg',amplitude:12,onsetHours:0.4,peakHours:1.5,halfLifeHours:6.0},
   green_tea:{key:'green_tea',name:'Green tea',glyph:'leaf',tint:'mint',defaultDose:40,unit:'mg',amplitude:9,onsetHours:0.4,peakHours:1.3,halfLifeHours:6.0},
+  // Mate / yerba mate: a South American infusion carrying caffeine +
+  // theobromine. Default dose is a typical ~40 mg caffeine per gourde. The
+  // amplitude, onset and half-life mirror green_tea because that is what the
+  // same alkaloid profile delivers in practice, and Peak's caffeine maths
+  // only models the caffeine side.
+  mate:{key:'mate',name:'Mate',glyph:'gourd',tint:'mint',defaultDose:40,unit:'mg',amplitude:9,onsetHours:0.4,peakHours:1.3,halfLifeHours:6.0},
   pre_workout:{key:'pre_workout',name:'Pre-workout',glyph:'bolt',tint:'amber',defaultDose:200,unit:'mg',amplitude:22,onsetHours:0.3,peakHours:1.0,halfLifeHours:5.0},
   cold_brew:{key:'cold_brew',name:'Cold brew',glyph:'coffee',tint:'mint',defaultDose:200,unit:'mg',amplitude:21,onsetHours:0.3,peakHours:1.0,halfLifeHours:5.0},
 };
@@ -445,6 +451,9 @@ function glyph(name){
   if(name==='coffee')return `<svg viewBox="0 0 24 24" ${s}><path d="M4 8h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Z"/><path d="M17 9h2.5a2.5 2.5 0 0 1 0 5H17"/><path d="M8 3.5c-.5.6-.5 1.4 0 2M12 3.5c-.5.6-.5 1.4 0 2"/></svg>`;
   if(name==='bolt')return `<svg viewBox="0 0 24 24" ${s}><path d="M13 2 4 14h7l-1 8 10-12h-7l1-8Z"/></svg>`;
   if(name==='leaf')return `<svg viewBox="0 0 24 24" ${s}><path d="M20 4C9 4 4 9 4 18c9 0 15-3 16-14Z"/><path d="M4 20c3-6 7-9 12-11"/></svg>`;
+  // Yerba mate: a small round gourde (mate) with a slim bombilla sticking out
+  // at an angle. Both shapes are simple line paths.
+  if(name==='gourd')return `<svg viewBox="0 0 24 24" ${s}><path d="M8 14a5 5 0 1 1 10 0c0 3-2.5 5-5 5s-5-2-5-5Z"/><path d="M15.5 14.5l3-7"/></svg>`;
   return `<svg viewBox="0 0 24 24" ${s}><circle cx="12" cy="12" r="8"/></svg>`;
 }
 
@@ -454,7 +463,8 @@ function glyph(name){
    whoop via save_data, feel drags write back through the bridge. */
 const DEMO={ weightKg:75, whoop:{}, logs:[], events:[], taps:[] };
 let D=JSON.parse(JSON.stringify(DEMO));
-let quickKeys=['coffee','espresso','energy_drink','matcha'];
+let quickKeys=['coffee','espresso','mate','matcha'];
+let savedState={};
 const BRIDGE=(typeof window!=='undefined'&&window.Vitality&&typeof window.Vitality.load==='function')?window.Vitality:null;
 
 /* The vitals tile's EXACT recovery formula, copied verbatim so this hardwired
@@ -538,12 +548,13 @@ async function boot(){
   if(BRIDGE){try{
     const s=await BRIDGE.load();
     if(s&&typeof s==='object'){
+      savedState=s;
       if(Array.isArray(s.logs))D.logs=s.logs;
       if(Array.isArray(s.events))D.events=s.events;
       if(Array.isArray(s.taps))D.taps=s.taps;
       if(typeof s.weightKg==='number')D.weightKg=s.weightKg;
       if(s.whoop&&typeof s.whoop==='object')D.whoop=s.whoop;
-      if(Array.isArray(s.quickKeys)&&s.quickKeys.length)quickKeys=s.quickKeys;
+      if(Array.isArray(s.quickKeys))quickKeys=s.quickKeys;
     }
   }catch(e){}}
   // vitals → peak, HARDWIRED: read the vitals tile and derive today's recovery
@@ -576,7 +587,7 @@ async function boot(){
   spawnMotes();
 }
 /* save the WHOLE store — a feel drag must never wipe what the mentor filed */
-function persist(){ if(BRIDGE&&typeof BRIDGE.save==='function'){try{BRIDGE.save({weightKg:D.weightKg,whoop:D.whoop,taps:D.taps,logs:D.logs,events:D.events,quickKeys});}catch(e){}} }
+function persist(){ if(BRIDGE&&typeof BRIDGE.save==='function'){try{BRIDGE.save({...savedState,weightKg:D.weightKg,whoop:D.whoop,taps:D.taps,logs:D.logs,events:D.events,quickKeys});}catch(e){}} }
 
 /* ═══ CurveChart.tsx — ported render ═══ */
 const PAD={top:18,right:24,bottom:32,left:24},RANGE=24,HEIGHT=320;
@@ -863,13 +874,13 @@ function onLog(key){
 }
 document.getElementById('stackGrid').addEventListener('click',e=>{
   const rm=e.target.closest('[data-remove]');
-  if(rm){const k=rm.getAttribute('data-remove');quickKeys=quickKeys.filter(x=>x!==k);D.logs=D.logs.filter(l=>l.key!==k);persist();render();renderStrip();renderStack();renderReadout();renderGauge(null);return;}
+  if(rm){const k=rm.getAttribute('data-remove');quickKeys=quickKeys.filter(x=>x!==k);persist();render();renderStrip();renderStack();renderReadout();renderGauge(null);return;}
   const lg=e.target.closest('[data-log]');
   if(lg){lg.classList.add('charge');setTimeout(()=>lg.classList.remove('charge'),640);onLog(lg.getAttribute('data-log'));}
 });
 
 /* the "+ Add" popover — pin another source from the library */
-const ADD_LIBRARY=['green_tea','pre_workout','cold_brew'];
+const ADD_LIBRARY=Object.keys(SUBSTANCES);
 function renderAddRow(){
   const row=document.getElementById('addRow');
   const avail=ADD_LIBRARY.filter(k=>!quickKeys.includes(k));
