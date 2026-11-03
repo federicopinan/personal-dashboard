@@ -1,5 +1,4 @@
 import Dashboard from './app/Dashboard'
-import { site } from '@/content/site'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -10,5 +9,5 @@ export const metadata: Metadata = {
 // per-browser userId keeps the localStorage namespaces (chrome, tile skins,
 // layout) stable.
 export default function Page() {
-  return <Dashboard firstName={site.name || null} userId="me" />
+  return <Dashboard userId="me" />
 }

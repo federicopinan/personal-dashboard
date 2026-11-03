@@ -7,6 +7,7 @@ import DashboardHeader from './DashboardHeader'
 import WelcomeBackdrop from '@/components/WelcomeBackdrop'
 import DashboardHeaderGem from './DashboardHeaderGem'
 import DashboardGrid from './DashboardGrid'
+import Onboarding from './Onboarding'
 import '@/components/veeTiles.css'
 import { dashboardChrome, backgroundAccent, DEFAULT_CHROME, type DashboardChrome } from '@/lib/tiles/dashboardChrome'
 import { activeGoal, goals, saveGoals, activeGoalId, setActiveGoalId, type Goal } from '@/lib/tiles/weights'
@@ -15,7 +16,6 @@ import { tileStore } from '@/lib/tiles/tileStore'
 import { localDateKey } from '@/lib/localDate'
 
 interface DashboardProps {
-  firstName: string | null
   userId: string
 }
 
@@ -68,6 +68,7 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
 
   const handleSaveProfile = () => {
     saveProfile(prof)
+    window.dispatchEvent(new Event('vitality:profile'))
     setProfSaved(true)
     window.setTimeout(() => setProfSaved(false), 2000)
   }
@@ -190,10 +191,11 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Sex</label>
                   <select
-                    value={prof.sex ?? 'male'}
+                    value={prof.sex ?? ''}
                     onChange={(e) => setProf({ ...prof, sex: e.target.value as 'male' | 'female' })}
                     style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'var(--bg, #000)', border: '1px solid var(--border, #262626)', color: 'var(--fg, #fff)', fontSize: 16 }}
                   >
+                    <option value="">Not specified</option>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
                   </select>
@@ -416,17 +418,23 @@ function RouteLinks() {
   )
 }
 
-export default function Dashboard({ firstName, userId }: DashboardProps) {
+export default function Dashboard({ userId }: DashboardProps) {
   const [chrome, setChrome] = useState<DashboardChrome | undefined>(undefined)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [firstName, setFirstName] = useState<string | undefined>()
+  const [gymRequest, setGymRequest] = useState(0)
+  const [gymOpened, setGymOpened] = useState(0)
   const [goalAccent, setGoalAccent] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     setChrome(dashboardChrome.get(userId))
+    setFirstName(profile().name)
+    const onProfile = () => setFirstName(profile().name)
+    window.addEventListener('vitality:profile', onProfile)
     try { setGoalAccent(activeGoal()?.accent) } catch {}
     const onGoal = () => setGoalAccent(activeGoal()?.accent)
     window.addEventListener('vitality:goal', onGoal)
-    return () => window.removeEventListener('vitality:goal', onGoal)
+    return () => { window.removeEventListener('vitality:goal', onGoal); window.removeEventListener('vitality:profile', onProfile) }
   }, [userId])
 
   const wallAccent = goalAccent ?? (chrome ? backgroundAccent(chrome.background) : '#6EE7B7')
@@ -454,7 +462,8 @@ export default function Dashboard({ firstName, userId }: DashboardProps) {
           </div>
         </div>
 
-        <DashboardGrid userId={userId} chrome={chrome ?? DEFAULT_CHROME} />
+        <Onboarding gymOpened={gymOpened} onGym={() => setGymRequest((n) => n + 1)} />
+        <DashboardGrid userId={userId} chrome={chrome ?? DEFAULT_CHROME} gymRequest={gymRequest} onGymOpened={() => setGymOpened((n) => n + 1)} />
 
         <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 16px 48px' }}>
           <RouteLinks />

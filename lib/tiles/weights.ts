@@ -107,7 +107,7 @@ export const DEFAULT_GOALS: Goal[] = [
 
 /** The overseer's synthesis of EVERY goal, polished into one sentence by the
  *  mentor (Claude Code). Switching it on = top priority — the board goes gold. */
-export const OVERALL_GOAL: Goal = {
+const LEGACY_OVERALL_GOAL: Goal = {
   id: 'overall',
   title: "A SOC analyst who's jacked and trades",
   accent: '#00D4FF',
@@ -117,13 +117,18 @@ export const OVERALL_GOAL: Goal = {
   progress: 5,
 }
 
+export const OVERALL_GOAL: Goal = { id: 'overall', title: 'Your overall goal', weights: {} }
+
 /** Every tile that ships with a weight in the defaults. A saved goal that
  *  predates one of these gets the shipped value back — see withShippedWeights. */
-const SHIPPED_TILE_KEYS: string[] = Object.keys(OVERALL_GOAL.weights)
+const SHIPPED_TILE_KEYS: string[] = Object.keys(LEGACY_OVERALL_GOAL.weights)
 
 /** Overall first, then the individual goals. */
 export function allGoals(): Goal[] {
-  return [OVERALL_GOAL, ...goals()]
+  const list = goals()
+  if (list.length === 0 && activeGoalId() !== OVERALL_GOAL.id) return list
+  const legacy = list.some((goal) => DEFAULT_GOALS.some((item) => item.id === goal.id))
+  return [legacy ? LEGACY_OVERALL_GOAL : OVERALL_GOAL, ...list]
 }
 
 /** The full active Goal (incl. overall), for accent + title. */
@@ -247,7 +252,7 @@ export function noticedFeed(): Notice[] {
       /* fall through */
     }
   }
-  return DEFAULT_NOTICED
+  return []
 }
 
 /** Save the goals list (used by the mentor page's goal input). */
@@ -334,7 +339,7 @@ export function deleteGoal(id: string): DeleteResult {
 function shippedWeight(goalId: string, tileKey: string): number | undefined {
   const from = (g?: Goal) => (g && g.weights && tileKey in g.weights ? g.weights[tileKey] : undefined)
   const inDefaults = DEFAULT_GOALS.find((g) => g.id === goalId)
-  return from(inDefaults) ?? (OVERALL_GOAL.id === goalId ? from(OVERALL_GOAL) : undefined)
+  return from(inDefaults) ?? (LEGACY_OVERALL_GOAL.id === goalId ? from(LEGACY_OVERALL_GOAL) : undefined)
 }
 
 /**
@@ -413,7 +418,7 @@ export function storedGoals(): Goal[] {
       /* fall through */
     }
   }
-  return DEFAULT_GOALS
+  return []
 }
 
 /** All goals: localStorage override ('vitality:goals') if valid, else defaults,

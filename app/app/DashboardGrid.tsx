@@ -226,11 +226,13 @@ function OpenTileOverlay({
   register,
   unregister,
   onClose,
+  onLoad,
 }: {
   slot: { id: string; name: string; html: string }
   register: (w: Window | null, id: string) => void
   unregister: (w: Window | null) => void
   onClose: () => void
+  onLoad?: () => void
 }) {
   const winRef = useRef<Window | null>(null)
   return (
@@ -256,6 +258,7 @@ function OpenTileOverlay({
             onLoad={(e) => {
               winRef.current = e.currentTarget.contentWindow
               register(e.currentTarget.contentWindow, slot.id)
+              onLoad?.()
             }}
             className="openFrame"
             srcDoc={withBridge(slot.html)}
@@ -745,9 +748,11 @@ function VisionEmptyState({ onNewTile }: { onNewTile: () => void }) {
 interface DashboardGridProps {
   userId: string
   chrome?: DashboardChrome
+  gymRequest?: number
+  onGymOpened?: () => void
 }
 
-export default function DashboardGrid({ userId }: DashboardGridProps) {
+export default function DashboardGrid({ userId, gymRequest = 0, onGymOpened }: DashboardGridProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
   const [filled, setFilled] = useState<FilledMap>({})
@@ -766,6 +771,7 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
   const [xPeek, setXPeek] = useState(true) // the `x = %s` breakdown: flashes on change, fades after 5s (the `x` stays)
   const dragId = useRef<string | null>(null)
   const filledRef = useRef<FilledMap>({})
+  const gymAwaiting = useRef(false)
 
   useEffect(() => {
     if (!ref.current || (!openId && !connectId && !newOpen && !mentorAlive)) return
@@ -781,6 +787,13 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
   }, [openId, connectId, newOpen, mentorAlive])
 
   const { register, unregister } = useTileHost(userId, undefined, () => {})
+
+  useEffect(() => {
+    if (gymRequest && loaded) {
+      if (filled.train) { gymAwaiting.current = true; setOpenId('train') }
+      else setConnectId('train')
+    }
+  }, [gymRequest, loaded, filled.train])
 
   useEffect(() => {
     setMounted(true)
@@ -1195,7 +1208,13 @@ export default function DashboardGrid({ userId }: DashboardGridProps) {
           slot={{ id: openId, name: labelFor(openId), html: filled[openId] }}
           register={register}
           unregister={unregister}
-          onClose={() => setOpenId(null)}
+          onLoad={() => {
+            if (openId === 'train' && gymAwaiting.current) {
+              gymAwaiting.current = false
+              onGymOpened?.()
+            }
+          }}
+          onClose={() => { gymAwaiting.current = false; setOpenId(null) }}
         />
       )}
 
