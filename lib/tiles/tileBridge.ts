@@ -40,7 +40,7 @@ const SHIM = `<script>
       // real read of a slot the host has nothing for, so a tile had to render
       // a failed read as a fact. It now REJECTS, so a read that never arrived
       // can be told apart from one that arrived empty; the tiles that read
-      // (vitals, peak, sleep) already catch and fall back.
+      // (fuel, sleep) already catch and fall back.
       setTimeout(function () {
         if (!pending[id]) return;
         delete pending[id];

@@ -12,7 +12,6 @@ Every tile reports one normalized input score for the day, x ∈ 0–100:
 |---------|---------------------------------------------------|
 | fuel    | min(100, water_today / goal × 100)                |
 | train   | sessions_this_week / weekly_target × 100 (cap 100)|
-| vitals  | the recovery estimate (already 0–100)             |
 | peak    | today's average predicted score                   |
 
 | finance | on-plan ratio vs monthly target (cap 100)         |
@@ -61,57 +60,12 @@ Never jump a weight; glide it. When a tile that had no weight shows real
 signal, it ENTERS the goal (that's the seeded example: Train entered the
 YouTuber goal at 8% because workouts predicted output).
 
-## 5 · Recovery (vitals → peak) — one formula, two runners
+## 5 · Sleep history
 
-Poor sleep must reshape the Peak curve. Two things compute recovery and they
-MUST agree, or the number flip-flops between refreshes:
-
-- **The tile, client-side (hardwired).** Peak reads the vitals slot on load
-  (`window.Vitality.read('vitals')`) and derives today's recovery itself — no
-  server, no sweep. This is why a bad night shows up the instant they
-  refresh.
-- **The mentor, write-time.** When Claude (Code) is in the folder, the user
-  asks for a sweep; Claude computes the same recovery from the vitals store
-  and either updates the peak store or tells the user what changed. The
-  dashboard never writes to a backend anymore — Netlify cannot persist
-  server writes into a browser's localStorage, so the historical `/sweep`
-  server-side path is gone (see `/sweep` for the on-device alternatives).
-
-Both use this EXACT formula. A device recovery (`whoopRecovery`, from WHOOP in
-Episode 2) wins outright; otherwise it's the two bone-simple manual inputs:
-
-    clamp01(x) = max(0, min(1, x))
-
-    whoopRecovery present → round(whoopRecovery)          (a device wins)
-    else, weighted average of what exists:
-      feel   present → clamp(0..100, feel)                weight 0.6
-      sleep  present → clamp01(hours / 8) · 100            weight 0.4
-
-    recovery = round( Σ(partᵢ · wᵢ) / Σ wᵢ ),  clamped to 1..99
-
-`feel` is the 0–100 value behind the Vitals feel chips (Wrecked 25 … Great 95).
-`sleep` is the night's hours, and it is **no longer read off the vitals record**:
-the `sleepHours` field has been retired. The Sleep tile owns hours in its own
-store, so the formula takes them as a SECOND argument — the lookup moved to the
-call site, the maths did not change.
-
-**The night is the key.** A night is stored under the day it *began*: the night
-of Tuesday is `2026-09-30`, typed on Wednesday morning. A vitals record under
-`k` was logged on the morning of `k` and is about the night of `k − 1 day`, so
-every reader resolves "last night's sleep" as `todayKey − 1 day`. The retired
-`sleepHours` field used the *logging* day, and Sleep's migration shifts each
-legacy key back one night on import. Get this backwards and the two stores can
-never agree, which silently deletes the sleep half of every recovery number.
-
-A missing night is an absence, not a zero, and is left out of the weighted
-average entirely (the `sw` normaliser handles the missing term).
-
-Peak then scales its whole curve by `k = 0.55 + (recovery/100)·0.65`. The
-canonical source is `estRecovery` in `public/tiles/vitals.html`; the verbatim
-copy is `recoveryFromVitals` in `public/tiles/peak.html`. (`tiles-library/` is
-what `/vitality` installs from — a copy of these, not the origin.) Change one,
-change all three (both tiles + this doc + the on-tile derivation). Never round
-differently or add a term — matching is the whole point.
+Sleep stores hours under the date the night began. Legacy Vitals records use
+logging mornings, so Sleep imports each eligible record under the preceding
+night without replacing an existing entry. The legacy store remains intact.
+Peak does not derive recovery from these records.
 
 ## House rules
 

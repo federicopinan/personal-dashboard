@@ -91,7 +91,7 @@ bridge, `window.Vitality.save()` and `window.Vitality.load()`, which the dashboa
 provides. Full contract: [`public/tiles/README.md`](public/tiles/README.md) and
 [`.claude/commands/tile.md`](.claude/commands/tile.md).
 
-The tiles that ship: `train`, `fuel`, `vitals`, `sleep`, `screen`, `vee`, `peak`, `finance`.
+The tiles that ship: `train`, `fuel`, `sleep`, `screen`, `vee`, `peak`, `finance`.
 
 `tiles-library/` is the source these are copied FROM. Editing a tile means
 editing `public/tiles/<slot>.html` and copying the change back

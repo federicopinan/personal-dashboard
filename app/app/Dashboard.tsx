@@ -10,7 +10,7 @@ import DashboardGrid from './DashboardGrid'
 import Onboarding from './Onboarding'
 import '@/components/veeTiles.css'
 import { dashboardChrome, backgroundAccent, DEFAULT_CHROME, type DashboardChrome } from '@/lib/tiles/dashboardChrome'
-import { activeGoal, goals, saveGoals, activeGoalId, setActiveGoalId, type Goal } from '@/lib/tiles/weights'
+import { activeGoal, goals, saveGoalSettings, activeGoalId, setActiveGoalId, type Goal } from '@/lib/tiles/weights'
 import { profile, saveProfile, type Profile } from '@/lib/tiles/profile'
 import { tileStore } from '@/lib/tiles/tileStore'
 import { localDateKey } from '@/lib/localDate'
@@ -36,6 +36,7 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
 
   // Goals state
   const [goalList, setGoalList] = useState<Goal[]>(() => goals())
+  const [originalGoals, setOriginalGoals] = useState<Goal[]>(() => goals())
   const [selectedGId, setSelectedGId] = useState<string>(() => activeGoalId() || (goals()[0]?.id ?? ''))
   const [goalsSaved, setGoalsSaved] = useState(false)
 
@@ -52,7 +53,9 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
   // drag to a deliberate delete is the smaller wrong.
   useEffect(() => {
     const onGoal = () => {
-      setGoalList(goals())
+      const updated = goals()
+      setGoalList(updated)
+      setOriginalGoals(updated)
       setSelectedGId(activeGoalId() || goals()[0]?.id || '')
     }
     window.addEventListener('vitality:goal', onGoal)
@@ -74,7 +77,7 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
   }
 
   const handleSaveGoals = () => {
-    saveGoals(goalList)
+    saveGoalSettings(goalList, originalGoals)
     setActiveGoalId(selectedGId)
     setGoalsSaved(true)
     window.dispatchEvent(new Event('vitality:goal'))
@@ -252,7 +255,7 @@ function SettingsPanel({ userId, onClose }: { userId: string; onClose: () => voi
 
                   <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>Weights per tile (%):</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {['train', 'fuel', 'vitals', 'sleep', 'screen', 'peak', 'finance'].map((tileKey) => {
+                    {['train', 'fuel', 'sleep', 'screen', 'peak', 'finance'].map((tileKey) => {
                       const weightVal = currentGoal.weights?.[tileKey] ?? 0
                       return (
                         <div key={tileKey} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>

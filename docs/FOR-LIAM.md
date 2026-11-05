@@ -41,11 +41,11 @@ Tiles are sealed sandboxed iframes; they CANNOT fetch. They talk to the dashboar
 ONLY through `window.Vitality`:
 - `save(data)` / `load()` — persist + read this tile's own data (browser
   localStorage; per-device, no cloud lane)
-- `read(slot)` — read another tile's data (e.g. Peak reads Vitals)
+- `read(slot)` — read another tile's data (e.g. Sleep reads legacy sleep history)
 - `stock(symbol)` — latest price (needs the user's free `FINNHUB_API_KEY`, server-routed
   through `/api/finance/quote`; Netlify keeps the key server-side)
 
-Slots: `train fuel vitals peak finance` (+ `vee`). Aesthetic: **vanilla CSS
+Slots: `train fuel sleep peak finance` (+ `vee`). Aesthetic: **vanilla CSS
 only**, near-black bg, mint `#6EE7B7` / gold accents, serif = Georgia italic.
 
 ## The one rule

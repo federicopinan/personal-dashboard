@@ -6,7 +6,7 @@ Luke's one-liner: **find yourself, your algorithm.** The dashboard is an equatio
 y  =  w1·x1 + w2·x2 + w3·x3 + …
 
 y  = the Mentor tile (the OUTPUT): your #1 goal, everything summed
-x  = each input tile (Train, Fuel, Vitals, … and every tile you add)
+x  = each input tile (Train, Fuel, Sleep, … and every tile you add)
 w  = that tile's weight toward the goal (≈ 22% bottom-right badge)
 ```
 
@@ -58,7 +58,7 @@ through `window.Vitality.save`* — same shape, no cloud lane.
   (0–100, computed from its own data — defined per episode); it reports through the
   existing trusted bridge (`Vitality.report`, per-tile identity in useTileHost — the
   report lane exists in code but is currently a no-op in the base). Host aggregates:
-  **score = Σ weight × tile score**, shows per-tile contribution (x = vitals = 45.3%).
+  **score = Σ weight × tile score**, shows per-tile contribution (x = sleep = 45.3%).
 - Claude (optional, user's own subscription) advises ON TOP of the numbers — the
   numbers themselves never need a key.
 

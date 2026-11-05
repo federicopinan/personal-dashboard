@@ -37,7 +37,6 @@ too.
 |----------|----------|----------------------------|
 | `train`  | Train    | `public/tiles/train.html`  |
 | `fuel`   | Fuel     | `public/tiles/fuel.html`   |
-| `vitals` | Vitals   | `public/tiles/vitals.html` |
 | `sleep`  | Sleep    | `public/tiles/sleep.html`  |
 | `screen` | Screen   | `public/tiles/screen.html` |
 | `vee`    | Vee      | `public/tiles/vee.html`    |
@@ -95,10 +94,8 @@ cp public/tiles/<slot>.html tiles-library/
 
 `sleep.html` owns the hours. A night is stored under the day it **began** — the
 night of Tuesday is `2026-09-30`, even though you type it on Wednesday morning.
-Any tile reading the hours must look back one night from the day it is
-displaying. `vitals.html` and `peak.html` both do this; the date helpers are
-copied into each file on purpose, because a tile is one sealed file with no
-imports and no network, so there is nowhere to share them from.
+Legacy Vitals sleep hours are imported from the morning-keyed store under the
+preceding night without overwriting existing entries; the legacy store is retained.
 
 ### Fuel is keyed by the day, and it owns the water
 

@@ -90,11 +90,11 @@ export function useTileHost(
       }
 
       // Cross-tile READ — the host hands a tile another slot's saved data so
-      // tiles can react to each other client-side (e.g. Peak reshaping from
-      // the Vitals recovery). Read-only, the user's OWN data, and
+      // tiles can migrate or read their own data client-side. Read-only, the user's OWN data, and
       // whitelisted to the data slots (never 'vee' or internals).
       if (msg.type === 'read') {
         const slot = String(msg.slot || '')
+        // 'vitals' remains readable only for Sleep's legacy history migration.
         // 'water' is a RETIRED slot, not a live one: there is no Water tile any
         // more, but fuel.html has to read that slot once to bring the days
         // logged there across into Fuel. Drop this entry in the same commit

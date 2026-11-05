@@ -15,7 +15,6 @@ was and what it linked to.
 | `lab/subs.html` | Subscription radar preview. |
 | `lab/tesseract-deck.html` | Tesseract deck — tile design system preview. |
 | `tiles/peak.html` | Peak tile standalone preview (duplicate of `public/tiles/peak.html` in design-lab context). |
-| `tiles/vitals.html` | Vitals tile standalone preview (duplicate of `public/tiles/vitals.html` in design-lab context). |
 
 ## What referenced it
 

@@ -12,7 +12,7 @@ it means each tile shows a glanceable live number on its face without opening
 the overlay.
 
 - **Target**: Train tile shows today's set count, Fuel shows today's water,
-  Vitals shows recovery %, Finance shows on-track %, Peak shows score.
+  Sleep shows hours, Finance shows on-track %, Peak shows score.
 - **How**: `DashboardGrid` reads reported values from each tile's data,
   passes them as `data-stat` on the poster face. `veeTilesAnim.ts` picks
   them up.

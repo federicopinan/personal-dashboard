@@ -6,22 +6,8 @@
 <meta name="theme-color" content="#050505" />
 <title>Sleep</title>
 <!--
-  SLEEP — the tile that OWNS sleep. One number a night (hours), logged with the
-  same 0.5h stepper Vitals used to carry, and a bar per night so the pattern is
-  visible instead of guessed at.
-
-  SINGLE OWNER: sleepHours lived inside the Vitals tile, where peak.html had to
-  re-derive it by hand. Sleep now keeps its OWN store and Vitals reads it back
-  through Vitality.read('sleep') (whitelisted in useTileHost's READABLE). The
-  direction is one-way on purpose: the bridge has no cross-tile write, and two
-  writers for one number is how a copy goes stale.
-
-  THE NIGHT IS THE KEY. A night is stored under the day it BEGAN: the night of
-  Tuesday is `…-09-30`, typed on Wednesday morning. The legacy Vitals store keyed
-  the same fact by the morning it was LOGGED, so the migration shifts every key
-  back one night (nightKeyForLegacy) and the readers look one night back
-  (lastNightKeyAt). One convention on both sides, or the sleep half of recovery
-  is dead for every night logged from here on.
+  SLEEP — one night-keyed entry (hours) and one bar per night.
+  A night is keyed by the day it began, not the morning it was logged.
 
   MIGRATION: every sleepHours still sitting in Vitality.read('vitals') is
   imported whenever it is MISSING from this store — not "on the first load".
@@ -191,7 +177,7 @@
     <div class="stats" id="stats"></div>
   </section>
 
-  <p class="foot">each bar is one night, labelled with the night it began &middot; sleep feeds your vitals recovery &middot; 14h is the ceiling on the stepper</p>
+  <p class="foot">each bar is one night, labelled with the night it began &middot; 14h is the ceiling on the stepper</p>
 </div>
 <script>
 /* ═══ PURE:BEGIN — no DOM, no bridge, no Date.now(). Everything below is a
@@ -256,8 +242,7 @@ function windowDates(endKey,n,all){
 /** Only a real number of hours is a fact about a night.
     `Number(null)`, `Number(false)`, `Number('')` and `Number([])` are ALL 0, so
     a coercive cast invents a 0h night out of an absent value — and a fabricated
-    0 then draws a logged bar, drags the window average and drives Vitals'
-    recovery. So a value must be a finite NUMBER (which is what the stepper
+    0 then draws a logged bar, drags the window average. So a value must be a finite NUMBER (which is what the stepper
     writes and what JSON round-trips) and must already sit inside the stepper's
     own 0–14 range. A genuine 0 SURVIVES: a real 0h night is a different fact
     from not logging one, and the chart draws them differently.
@@ -265,8 +250,7 @@ function windowDates(endKey,n,all){
     looking but wrong night into a store with no backup, and because the Sleep
     store outranks the legacy field everywhere it is read, the wrong value would
     then outrank the truth forever. Rejecting costs nothing: the raw legacy
-    sleepHours is left in the Vitals store and stays readable through the
-    readers' fallback, it simply gets no bar here.
+    sleepHours is left in the Vitals store unchanged, it simply gets no bar here.
     Finer than the stepper's own 0.5h grid is QUANTISED to it (moves a value by
     at most 0.25h, never turns one night into another), because 0.5h IS this
     tile's resolution of an hour. */
@@ -291,8 +275,7 @@ function ownNights(store){
     it instead of one night early.
     Non-destructive per NIGHT: a night this tile already holds — always a real
     {hours:<number>} the user logged by hand — ALWAYS wins, so a re-run can
-    never overwrite a log with a stale copy. Anything unparseable in our own
-    store is repaired rather than respected, because it is not a night.
+    never overwrite a log with a stale copy. Any existing entry in our own store is preserved.
     Returns the merged store plus an HONEST count of what actually came across,
     so the caller reports what happened instead of guessing. */
 function mergeSleepHistory(own,vitalsStore){
@@ -303,14 +286,13 @@ function mergeSleepHistory(own,vitalsStore){
   var imported=0;
   if(vitalsStore&&typeof vitalsStore==='object'&&!Array.isArray(vitalsStore)){
     Object.keys(vitalsStore).forEach(function(k){
-      if(!isDateKey(k)) return;
+      if(!isDateKey(k)||dateKey(parseKey(k))!==k) return;
       var rec=vitalsStore[k];
       if(!rec||typeof rec!=='object') return;
       var h=normHours(rec.sleepHours);
       if(h==null) return;                    // not a fact about a night
       var nk=nightKeyForLegacy(k);           // the night BEFORE the log day
-      var mine=merged[nk];
-      if(mine&&typeof mine==='object'&&typeof mine.hours==='number'&&isFinite(mine.hours)) return; // ours wins
+      if(Object.prototype.hasOwnProperty.call(merged,nk)) return; // preserve any existing entry
       merged[nk]={hours:h};
       imported++;
     });

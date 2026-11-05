@@ -11,7 +11,7 @@ Tone: warm, plain-language. Explain what you're doing in a sentence, do it, then
 ## What "the full dashboard" is
 
 The complete set of ready-made tiles ships bundled with this project in the **`tiles-library/`** folder
-(Train, Fuel, Vitals, Sleep, Vee, Peak, Finance). Installing = copying them into `public/tiles/`, which
+(Train, Fuel, Sleep, Vee, Peak, Finance). Installing = copying them into `public/tiles/`, which
 is the folder the board reads. A fresh board is blank because that folder starts empty; this fills it.
 
 The dashboard is local-only — every tile's saved data lives in the browser's localStorage through
@@ -51,7 +51,7 @@ a tile opens the real thing.
 Say it plainly: this is a starting point, not a cage.
 - **Don't want a tile?** Delete its file in `public/tiles/` (e.g. `rm public/tiles/finance.html`) and it
   disappears from the board on reload.
-- **Want to change one?** Rebuild it your way with `/tile <slot>` (slots: `train, fuel, vitals, sleep,
+- **Want to change one?** Rebuild it your way with `/tile <slot>` (slots: `train, fuel, sleep,
   vee, peak, finance`), or just ask me to edit `public/tiles/<slot>.html`. If you edit it there, copy
   the change back with `cp public/tiles/<slot>.html tiles-library/` so the next install keeps it.
 

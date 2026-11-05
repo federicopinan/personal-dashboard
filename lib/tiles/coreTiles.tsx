@@ -4,7 +4,7 @@ import type { DashboardTileStats } from '@/lib/vitality/dashboardStats'
 import { humanizeTileId } from './tileRoster'
 
 /**
- * The core tiles are Vitality's pre-installed apps (Train, Fuel, Vitals, Peak,
+ * The core tiles are Vitality's pre-installed apps (Train, Fuel, Sleep, Peak,
  * Brand, Finance). On the fused dashboard they live in the SAME grid as
  * a user's own built tiles, so they can be dragged, resized, removed, and
  * re-added from the library just like any tile. This registry is the static
@@ -24,7 +24,6 @@ import { humanizeTileId } from './tileRoster'
 export type CoreTileId =
   | 'train'
   | 'fuel'
-  | 'vitals'
   | 'sleep'
   | 'screen'
   | 'peak'
@@ -105,26 +104,6 @@ export const CORE_TILES: Record<CoreTileId, CoreTile> = {
       s.fuelKcalToday != null
         ? { value: s.fuelKcalToday.toLocaleString('en-US'), unit: 'kcal' }
         : null,
-  },
-  vitals: {
-    id: 'vitals',
-    href: '/app/starter',
-    index: '04',
-    label: 'Vitals',
-    variant: 'live',
-    orb: { mode: 'wander' },
-    defaultSize: 's',
-    glyph: (
-      <svg viewBox="-12 -12 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round">
-        <path d="M-10 0 L-5 0 L-2 -7 L2 7 L5 0 L10 0" />
-      </svg>
-    ),
-    art: (
-      <svg className="art" viewBox="0 0 210 118">
-        <path className="mot" d="M38 47 L74 47 L89 27 L104 70 L119 47 L172 47" />
-        <g className="orb"><circle className="glow" r="8" /><circle className="node" r="3.2" /></g>
-      </svg>
-    ),
   },
   sleep: {
     id: 'sleep',
@@ -282,7 +261,7 @@ export type HomeTileId = CoreTileId | 'vee' | 'library'
  * 2-wide band high in the second row (the always-on "your apps" shelf, the
  * platform's front door; building and uploading tiles live inside it), Vee the
  * 2x2 centre, talls down the sides, Finance a 2-wide band at the foot. Sleep
- * sits beside Vitals because it feeds it, and Screen goes straight after it
+ * sits beside Screen
  * because that pairing is the whole reason Screen exists. Hydration is not a
  * tile of its own: it lives inside Fuel, which is what Fuel's one number always
  * was. Every tile drags, resizes, and can be removed. User-built tiles append.
@@ -299,7 +278,6 @@ export const DEFAULT_HOME_ORDER: HomeTileId[] = [
   'train',
   'fuel',
   'library',
-  'vitals',
   'sleep',
   'screen',
   'vee',

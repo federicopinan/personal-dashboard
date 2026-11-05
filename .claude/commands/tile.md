@@ -6,7 +6,7 @@ You are building ONE dashboard tile for a Vitality Base fork.
 
 The argument is the tile's id — a short lowercase name, no spaces (`coffee`,
 `reading`, `guitar`). It must be one of:
-`train, fuel, vitals, sleep, screen, vee, brand, peak, finance`
+`train, fuel, sleep, screen, vee, brand, peak, finance`
 
 If the argument is not one of those, it is a NEW tile. That is allowed and
 normal: this is how every new input on the board gets made. If no id is given,
