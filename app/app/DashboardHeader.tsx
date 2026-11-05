@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import gsap from 'gsap'
+import { useState, useEffect } from 'react'
+import FadeContent from '@/components/FadeContent'
 import styles from './dashboard.module.css'
 import { DEFAULT_CHROME, type Greeting, type DateConfig } from '@/lib/tiles/dashboardChrome'
 import HeaderStatus from '@/components/HeaderStatus'
@@ -27,20 +27,11 @@ interface DashboardHeaderProps {
  * header that says "Late night" agrees with the clock that says 23:42.
  */
 export default function DashboardHeader({ firstName, greeting, date, userId }: DashboardHeaderProps) {
-  const header = useRef<HTMLDivElement>(null)
   const g = greeting ?? DEFAULT_CHROME.greeting
   const d = date ?? DEFAULT_CHROME.date
   const [autoWord, setAutoWord] = useState('')
   const [fullDate, setFullDate] = useState('')
   const [todayDate, setTodayDate] = useState('')
-
-  useEffect(() => {
-    const mm = gsap.matchMedia()
-    mm.add('(prefers-reduced-motion: no-preference)', () => {
-      gsap.fromTo(header.current, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.42, ease: 'power2.out' })
-    }, header)
-    return () => mm.revert()
-  }, [])
 
   useEffect(() => {
     const now = new Date()
@@ -65,7 +56,7 @@ export default function DashboardHeader({ firstName, greeting, date, userId }: D
   const dateText = d.format === 'today' ? todayDate : fullDate
 
   return (
-    <div className={styles.header} ref={header} style={{ ['--greet-scale' as string]: g.scale }}>
+    <FadeContent className={styles.header} initialOpacity={0.75} duration={0.42} style={{ ['--greet-scale' as string]: g.scale }}>
       <h1 className={styles.greeting}>
         {word}
         {renderName ? (
@@ -76,6 +67,6 @@ export default function DashboardHeader({ firstName, greeting, date, userId }: D
       </h1>
       {d.show && <p className={styles.date}>{dateText}</p>}
       <HeaderStatus userId={userId} />
-    </div>
+    </FadeContent>
   )
 }
