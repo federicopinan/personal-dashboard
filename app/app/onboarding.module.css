@@ -1,5 +1,5 @@
 .panelWrap {
-  font-family: 'Dashboard Geist', var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-geist), var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   max-width: 640px;
   margin: 20px auto;
 }

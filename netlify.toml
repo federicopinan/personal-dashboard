@@ -11,3 +11,64 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# ── Caching ──────────────────────────────────────────────────────────────
+# Hashed Next.js assets never change content, so the browser can keep them
+# for a year. HTML pages are cached only at the CDN edge (the header is
+# stripped before it reaches the browser) and revalidated in the background,
+# so a deploy is live immediately while repeat visits stay fast.
+
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/_next/image"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/tiles/*"
+  [headers.values]
+    Cache-Control = "public, max-age=300, stale-while-revalidate=86400"
+    Netlify-CDN-Cache-Control = "public, max-age=31536000, stale-while-revalidate=86400"
+
+# HTML pages (one rule per route so the API routes keep their own caching).
+[[headers]]
+  for = "/"
+  [headers.values]
+    Netlify-CDN-Cache-Control = "public, max-age=0, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/tasks"
+  [headers.values]
+    Netlify-CDN-Cache-Control = "public, max-age=0, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/notes"
+  [headers.values]
+    Netlify-CDN-Cache-Control = "public, max-age=0, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/mentor"
+  [headers.values]
+    Netlify-CDN-Cache-Control = "public, max-age=0, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/bookmarks"
+  [headers.values]
+    Netlify-CDN-Cache-Control = "public, max-age=0, stale-while-revalidate=86400"
+
+# ── Image CDN ────────────────────────────────────────────────────────────
+# Bookmark favicons are fetched from Google's s2 endpoint and optimized
+# (resized to 48px, AVIF) through /.netlify/images — those source URLs must
+# be allowlisted here or the CDN refuses to transform them.
+
+[images]
+  remote_images = ["https://www\\.google\\.com/s2/favicons\\?.*"]

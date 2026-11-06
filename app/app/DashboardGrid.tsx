@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import gsap from 'gsap'
 import { VEE_TILE, DEFAULT_HOME_ORDER, coreDefaultSize, coreTileFor, tileLabel, type CoreTile } from '@/lib/tiles/coreTiles'
 import { discoverTiles, humanizeTileId, isTileId, tileFilePath, type RosterProblem, type TileFetcher, type TileRescan, type TileRoster } from '@/lib/tiles/tileRoster'
 import dynamic from 'next/dynamic'
@@ -775,15 +774,26 @@ export default function DashboardGrid({ userId, gymRequest = 0, onGymOpened }: D
 
   useEffect(() => {
     if (!ref.current || (!openId && !connectId && !newOpen && !mentorAlive)) return
-    const mm = gsap.matchMedia()
-    mm.add('(prefers-reduced-motion: no-preference)', () => {
-      const overlay = ref.current?.querySelector('.openOverlay, .mentorOverlay')
-      if (!overlay) return
-      gsap.fromTo(overlay, { opacity: 0 }, { opacity: 1, duration: 0.2, ease: 'power2.out' })
-      const card = overlay.querySelector('.openCard')
-      if (card) gsap.fromTo(card, { y: 12 }, { y: 0, duration: 0.32, ease: 'power2.out' })
-    }, ref)
-    return () => mm.revert()
+    // gsap is pulled in lazily here: it only animates the open overlay's
+    // entrance, so it should not sit in the board's critical bundle.
+    let cancelled = false
+    let cleanup: (() => void) | undefined
+    import('gsap').then(({ default: gsap }) => {
+      if (cancelled || !ref.current) return
+      const mm = gsap.matchMedia()
+      mm.add('(prefers-reduced-motion: no-preference)', () => {
+        const overlay = ref.current?.querySelector('.openOverlay, .mentorOverlay')
+        if (!overlay) return
+        gsap.fromTo(overlay, { opacity: 0 }, { opacity: 1, duration: 0.2, ease: 'power2.out' })
+        const card = overlay.querySelector('.openCard')
+        if (card) gsap.fromTo(card, { y: 12 }, { y: 0, duration: 0.32, ease: 'power2.out' })
+      }, ref)
+      cleanup = () => mm.revert()
+    })
+    return () => {
+      cancelled = true
+      cleanup?.()
+    }
   }, [openId, connectId, newOpen, mentorAlive])
 
   const { register, unregister } = useTileHost(userId, undefined, () => {})

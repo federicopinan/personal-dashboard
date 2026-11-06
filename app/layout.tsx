@@ -1,6 +1,17 @@
 import type { Metadata, Viewport } from 'next'
+import localFont from 'next/font/local'
 import { Inter, Instrument_Serif, Hanken_Grotesk, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
+
+// Variable-weight Geist, the dashboard + onboarding body face. Declared with
+// next/font/local (instead of a hand-rolled @font-face) so Next self-hosts it,
+// emits the preload link for it, and applies font-display: swap itself.
+const geist = localFont({
+  src: './fonts/Geist-DMT.woff2',
+  weight: '100 900',
+  variable: '--font-geist',
+  display: 'swap',
+})
 
 const inter = Inter({
   subsets: ['latin'],
@@ -70,7 +81,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${instrumentSerif.variable} ${hankenGrotesk.variable} ${jetBrainsMono.variable}`}
+      className={`${geist.variable} ${inter.variable} ${instrumentSerif.variable} ${hankenGrotesk.variable} ${jetBrainsMono.variable}`}
     >
       <body>{children}</body>
     </html>
