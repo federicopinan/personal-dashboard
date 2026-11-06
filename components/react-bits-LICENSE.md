@@ -1,6 +1,9 @@
 React Bits FadeContent source:
 https://github.com/DavidHDev/react-bits/blob/f98eb873f7a2029f887fe9c463e4bd2429cd6387/src/ts-default/Animations/FadeContent/FadeContent.tsx
 
+React Bits AnimatedContent source:
+https://github.com/DavidHDev/react-bits/blob/f98eb873f7a2029f887fe9c463e4bd2429cd6387/src/ts-default/Animations/AnimatedContent/AnimatedContent.tsx
+
 License at that revision:
 https://github.com/DavidHDev/react-bits/blob/f98eb873f7a2029f887fe9c463e4bd2429cd6387/LICENSE.md
 

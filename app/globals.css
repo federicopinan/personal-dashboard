@@ -1,3 +1,13 @@
+/* Geist: vercel/geist-font at 003bc04f134716b5c75613961fa05ad9f4d7023a;
+   see fonts/Geist-LICENSE.txt. Used only by dashboard and onboarding. */
+@font-face {
+  font-family: 'Dashboard Geist';
+  src: url('./fonts/Geist-DMT.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 /* ----- Tokens ----- */
 
 :root {

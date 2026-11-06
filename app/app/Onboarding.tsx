@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, type FormEvent } from 'react'
-import FadeContent from '@/components/FadeContent'
+import AnimatedContent from '@/components/AnimatedContent'
 import styles from './onboarding.module.css'
 
 function parse(raw: string | null): unknown {
@@ -115,7 +115,7 @@ export default function Onboarding({ onGym, gymOpened = 0 }: { onGym: () => void
 
   if (step === 'hidden') return null
   return (
-    <FadeContent className={styles.panelWrap} initialOpacity={0.75} duration={0.4}>
+    <AnimatedContent className={styles.panelWrap} distance={10} initialOpacity={0.85} duration={0.4}>
     <section className={styles.panel} aria-labelledby="onboarding-title">
       {step === 'details' ? (
         <form onSubmit={save}>
@@ -137,6 +137,6 @@ export default function Onboarding({ onGym, gymOpened = 0 }: { onGym: () => void
       )}
       {error && <p role="alert">{error}</p>}
     </section>
-    </FadeContent>
+    </AnimatedContent>
   )
 }

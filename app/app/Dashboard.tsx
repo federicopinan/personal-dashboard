@@ -8,6 +8,7 @@ import WelcomeBackdrop from '@/components/WelcomeBackdrop'
 import DashboardHeaderGem from './DashboardHeaderGem'
 import DashboardGrid from './DashboardGrid'
 import Onboarding from './Onboarding'
+import AnimatedContent from '@/components/AnimatedContent'
 import '@/components/veeTiles.css'
 import { dashboardChrome, backgroundAccent, DEFAULT_CHROME, type DashboardChrome } from '@/lib/tiles/dashboardChrome'
 import { activeGoal, goals, saveGoalSettings, activeGoalId, setActiveGoalId, type Goal } from '@/lib/tiles/weights'
@@ -390,7 +391,7 @@ function RouteLinks() {
 
   return (
     <>
-      <div className={styles.navRow}>
+      <AnimatedContent className={styles.navRow} distance={12} initialOpacity={0.85} duration={0.5}>
         <Link href="/notes" className={styles.navCard}>
           <span className={styles.navKicker}>Notes</span>
           <span className={styles.navCount}>{counts.notes === null ? '' : `${counts.notes} saved`}</span>
@@ -406,7 +407,7 @@ function RouteLinks() {
           <span className={styles.navCount}>{counts.open === null ? '' : `${counts.open} open today`}</span>
           <span aria-hidden className={styles.navArrow}>→</span>
         </Link>
-      </div>
+      </AnimatedContent>
       {/* Deep work lives on its own app, so this leaves the dashboard entirely
           rather than opening a route here. It is its own row, not a third card
           in .navRow: that row is a fixed two-up and a third would break the

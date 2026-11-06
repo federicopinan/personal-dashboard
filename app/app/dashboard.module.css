@@ -28,6 +28,7 @@
  */
 
 .page {
+  font-family: 'Dashboard Geist', var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   position: relative;
   min-height: 100vh;
   /* viewportFit:cover + black-translucent status bar means the page paints
