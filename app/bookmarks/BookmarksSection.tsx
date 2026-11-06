@@ -152,7 +152,14 @@ export default function BookmarksSection() {
 
 function BookmarkCard({ bookmark, onDelete }: { bookmark: Bookmark; onDelete: () => void }) {
   const host = safeHost(bookmark.url)
-  const favicon = host ? `https://www.google.com/s2/favicons?domain=${host}&sz=64` : ''
+  // Favicon fetched once at 64px from Google's s2 endpoint, then resized and
+  // re-encoded (AVIF, 48px render) by Netlify's Image CDN — the CDN caches the
+  // transformed result at the edge, so no repeat hits to Google. The source
+  // domain is allowlisted in netlify.toml ([images] remote_images).
+  const faviconSource = host ? `https://www.google.com/s2/favicons?domain=${host}&sz=64` : ''
+  const favicon = faviconSource
+    ? `/.netlify/images?url=${encodeURIComponent(faviconSource)}&w=48&h=48&fm=avif&q=80`
+    : ''
   return (
     <div
       style={{
@@ -203,6 +210,7 @@ function BookmarkCard({ bookmark, onDelete }: { bookmark: Bookmark; onDelete: ()
               src={favicon}
               alt=""
               loading="lazy"
+              decoding="async"
               width={48}
               height={48}
               style={{ width: 48, height: 48, display: 'block' }}

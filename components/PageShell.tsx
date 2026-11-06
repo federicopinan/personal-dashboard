@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import gsap from 'gsap'
 import Link from 'next/link'
 import WelcomeBackdrop from './WelcomeBackdrop'
 import styles from './PageShell.module.css'
@@ -26,11 +25,22 @@ export default function PageShell({
 }) {
   const shell = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const mm = gsap.matchMedia()
-    mm.add('(prefers-reduced-motion: no-preference)', () => {
-      gsap.fromTo(shell.current, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.42, ease: 'power2.out' })
-    }, shell)
-    return () => mm.revert()
+    // gsap rides in lazily — it's only needed for this one entrance tween, so
+    // it stays out of the page's critical bundle and is fetched after hydrate.
+    let cancelled = false
+    let cleanup: (() => void) | undefined
+    import('gsap').then(({ default: gsap }) => {
+      if (cancelled || !shell.current) return
+      const mm = gsap.matchMedia()
+      mm.add('(prefers-reduced-motion: no-preference)', () => {
+        gsap.fromTo(shell.current, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.42, ease: 'power2.out' })
+      }, shell)
+      cleanup = () => mm.revert()
+    })
+    return () => {
+      cancelled = true
+      cleanup?.()
+    }
   }, [])
   return (
     <main className={`${styles.page} grain-overlay`}>
