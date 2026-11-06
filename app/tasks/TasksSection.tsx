@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useId, useRef } from 'react'
 import { localDateKey } from '@/lib/localDate'
+import { carryTasks, moveTask, readTasks, validTime, withTime, type Task } from '@/lib/taskSchedule'
 // The day control's styles still live in the dashboard module, where UX-4 put
 // them next to the focus-ring convention they follow. A CSS module is a
 // class-name map, so importing it from here costs no layout coupling and the
@@ -15,8 +16,14 @@ import styles from '@/app/app/dashboard.module.css'
  * the printed date and the storage key can never land on different days.
  */
 export default function TasksSection() {
-  const [tasks, setTasks] = useState<{ id: string; text: string; done: boolean }[]>([])
+  const [tasks, setTasks] = useState<Task[]>([])
   const [input, setInput] = useState('')
+  const [newDate, setNewDate] = useState('')
+  const [newTime, setNewTime] = useState('')
+  const [editing, setEditing] = useState<string | null>(null)
+  const [editDate, setEditDate] = useState('')
+  const [editTime, setEditTime] = useState('')
+  const [loadFailed, setLoadFailed] = useState(false)
   const [day, setDay] = useState(() => localDateKey(new Date()))
   const [history, setHistory] = useState<string[]>([])
   const [error, setError] = useState('')
@@ -50,14 +57,14 @@ export default function TasksSection() {
   }, [])
 
   useEffect(() => {
-    try { const r = localStorage.getItem(`vitality:tasks:${day}`); setTasks(r ? JSON.parse(r) : []); setError('') }
-    catch { setTasks([]); setError('Could not load tasks for this date.') }
+    try { setTasks(readTasks(localStorage, day)); setLoadFailed(false); setError('') }
+    catch { setTasks([]); setLoadFailed(true); setError('Could not load tasks for this date.') }
     setLoadedDay(day)
   }, [day])
 
   // Any committed change re-seeds the field, so stepping or picking a chip can
   // never leave a stale edit on screen.
-  useEffect(() => { setDayDraft(day) }, [day])
+  useEffect(() => { setDayDraft(day); setEditing(null) }, [day])
 
   useEffect(() => {
     if (!dayMountedRef.current) { dayMountedRef.current = true; return }
@@ -67,12 +74,13 @@ export default function TasksSection() {
   const ready = loadedDay === day
 
   const save = useCallback((next: typeof tasks, target = day) => {
+    if (!ready || loadFailed || target !== day) return false
     try {
       localStorage.setItem(`vitality:tasks:${target}`, JSON.stringify(next))
       setTasks(next); setHistory(prev => Array.from(new Set([target, ...prev])).sort().reverse()); setError('')
       return true
     } catch { setError('Could not save tasks. Your changes were not saved.'); return false }
-  }, [day])
+  }, [day, ready, loadFailed])
 
   /* The one and only way `day` changes. Every path — the two steppers, the text
      field, the native picker, the saved-date chips — funnels through here, and
@@ -102,8 +110,39 @@ export default function TasksSection() {
   }
 
   const addTask = () => {
-    if (!input.trim()) return
-    if (save([...tasks, { id: crypto.randomUUID(), text: input.trim(), done: false }])) setInput('')
+    if (!ready || loadFailed || !input.trim()) return
+    const destination = newDate || day
+    if (!normaliseDayKey(destination) || !validTime(newTime)) { setError('Enter a real date and a valid time.'); return }
+    const task = withTime({ id: crypto.randomUUID(), text: input.trim(), done: false }, newTime)
+    try {
+      if (destination === day) {
+        if (!save([...tasks, task])) return
+      } else {
+        const target = readTasks(localStorage, destination)
+        localStorage.setItem(`vitality:tasks:${destination}`, JSON.stringify([...target, task]))
+        setHistory(prev => Array.from(new Set([destination, ...prev])).sort().reverse())
+        setError('')
+      }
+      setInput(''); setNewTime(''); setNewDate('')
+    } catch { setError('Could not save the task to that date.') }
+  }
+
+  const saveEdit = (task: Task) => {
+    if (!ready || loadFailed) return
+    const destination = normaliseDayKey(editDate)
+    if (!destination || !validTime(editTime)) { setError('Enter a real date and a valid time.'); return }
+    const updated = withTime(task, editTime)
+    if (destination === day) {
+      if (!save(tasks.map(t => t.id === task.id ? updated : t))) return
+    } else {
+      try {
+        moveTask(localStorage, day, destination, tasks, updated)
+        setTasks(tasks.filter(t => t.id !== task.id))
+        setHistory(prev => Array.from(new Set([destination, ...prev])).sort().reverse())
+        setError('')
+      } catch { setError('Could not move the task. The source was retained; check the destination before retrying.'); return }
+    }
+    setEditing(null)
   }
 
   const toggle = (id: string) => {
@@ -186,33 +225,44 @@ export default function TasksSection() {
           sentence is what the title and aria-label say, so nothing about what it
           does is lost — the heading above already scopes it to a day, and the
           tooltip reads the same on a mouse as on a thumb. */}
-      <button type="button" onClick={() => { const prev = new Date(`${day}T12:00:00`); prev.setDate(prev.getDate() - 1); const source = localDateKey(prev); try { const prior = JSON.parse(localStorage.getItem(`vitality:tasks:${source}`) || '[]'); const targetIds = new Set(tasks.map(t => t.id)); const carry = prior.filter((t: { id: string; done: boolean }) => !t.done && !targetIds.has(t.id)); if (carry.length) save([...tasks, ...carry.map((t: { id: string; text: string }) => ({ id: t.id, text: t.text, done: false }))]); else setError('No new incomplete tasks to carry forward.') } catch { setError('Could not read the previous date’s tasks.') } }} title="Carry incomplete tasks from previous date" aria-label="Carry incomplete tasks from previous date" style={{ marginBottom: 12, minHeight: 'var(--touch)', padding: '0 14px', borderRadius: 8, background: 'transparent', color: 'var(--fg)', border: '1px solid var(--border)' }}>Carry forward</button>
+      <button type="button" disabled={!ready || loadFailed} onClick={() => { try { const prior = readTasks(localStorage, shiftDayKey(day, -1)); const next = carryTasks(tasks, prior); if (next.length > tasks.length) save(next); else setError('No new incomplete tasks to carry forward.') } catch { setError('Could not read the previous date’s tasks.') } }} title="Carry incomplete tasks from previous date" aria-label="Carry incomplete tasks from previous date" style={{ marginBottom: 12, minHeight: 'var(--touch)', padding: '0 14px', borderRadius: 8, background: 'transparent', color: 'var(--fg)', border: '1px solid var(--border)' }}>Carry forward</button>
       {/* flexWrap + minWidth:0 on the input is what makes this row survive 320px:
           the Add button is nowrap and must not shrink, so the input is the only
           thing allowed to give way — and when the row runs out of room it wraps
           the buttons onto a second line at full width instead of overflowing. */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
         <input
+          aria-label="Task description"
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') addTask() }}
           placeholder="Add a task..."
           style={{ flex: '1 1 180px', minWidth: 0, padding: '10px 14px', minHeight: 'var(--touch)', borderRadius: 8, border: '1px solid var(--border, #262626)', background: 'var(--bg, #0a0a0a)', color: 'var(--fg, #fff)', fontSize: 16, outline: 'none' }}
         />
-        <button onClick={addTask} style={{ padding: '0 18px', minHeight: 'var(--touch)', borderRadius: 8, border: 'none', background: 'var(--mint, #6EE7B7)', color: 'var(--mint-ink, #042a1c)', fontWeight: 600, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap' }}>
+        <label>Task date <input type="date" value={newDate || day} onChange={e => setNewDate(e.target.value)} style={{ maxWidth: '100%' }} /></label>
+        <label>Task time (optional) <input type="time" value={newTime} onChange={e => setNewTime(e.target.value)} /></label>
+        <button disabled={!ready || loadFailed} onClick={addTask} style={{ padding: '0 18px', minHeight: 'var(--touch)', borderRadius: 8, border: 'none', background: 'var(--mint, #6EE7B7)', color: 'var(--mint-ink, #042a1c)', fontWeight: 600, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap' }}>
           Add
         </button>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {ready && tasks.map(t => (
-          <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px 4px 0', background: 'var(--bg-elevated, #121212)', borderRadius: 8, border: '1px solid var(--border, #1c1c1c)' }}>
+          <div key={t.id} style={{ flexWrap: 'wrap', display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px 4px 0', background: 'var(--bg-elevated, #121212)', borderRadius: 8, border: '1px solid var(--border, #1c1c1c)' }}>
             {/* The checkbox is 20px; the label around it is the 44px target, and
                 because it wraps the input a tap on the label toggles the task
                 exactly as a tap on the box does. */}
             <label style={{ display: 'grid', placeItems: 'center', flex: '0 0 auto', width: 'var(--touch)', minHeight: 'var(--touch)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={t.done} onChange={() => toggle(t.id)} style={{ accentColor: 'var(--mint, #6EE7B7)', width: 20, height: 20, cursor: 'pointer' }} />
+              <input type="checkbox" aria-label={`Complete ${t.text}`} checked={t.done} onChange={() => toggle(t.id)} style={{ accentColor: 'var(--mint, #6EE7B7)', width: 20, height: 20, cursor: 'pointer' }} />
             </label>
-            <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: 'var(--fg)', textDecoration: t.done ? 'line-through' : 'none', opacity: t.done ? 0.5 : 1 }}>{t.text}</span>
+            <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontSize: 14, color: 'var(--fg)', textDecoration: t.done ? 'line-through' : 'none', opacity: t.done ? 0.5 : 1 }}>{t.text}{t.time && <span> — {t.time}</span>}</span>
+            <button type="button" onClick={() => { setEditing(t.id); setEditDate(day); setEditTime(t.time || '') }} aria-label={`Edit schedule for ${t.text}`}>Edit</button>
+            {editing === t.id && <div style={{ flex: '1 1 100%', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <label>Date for {t.text} <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} style={{ maxWidth: '100%' }} /></label>
+              <label>Time for {t.text} (optional) <input type="time" value={editTime} onChange={e => setEditTime(e.target.value)} /></label>
+              <button type="button" onClick={() => setEditTime('')}>Clear time</button>
+              <button type="button" onClick={() => saveEdit(t)}>Save</button>
+              <button type="button" onClick={() => setEditing(null)}>Cancel</button>
+            </div>}
             <button onClick={() => deleteTask(t.id)} style={{ flex: '0 0 auto', display: 'grid', placeItems: 'center', width: 'var(--touch)', height: 'var(--touch)', background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }} title="Delete" aria-label={`Delete ${t.text}`}>×</button>
           </div>
         ))}
